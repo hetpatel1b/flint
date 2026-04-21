@@ -12,6 +12,8 @@ interface State {
   sidebarOpen: boolean;
   rightPanelOpen: boolean;
   activeVaultId: string | null;
+  lastSaved: number | null;
+  autoSaveEnabled: boolean;
 }
 
 type Action =
@@ -34,226 +36,28 @@ type Action =
   | { type: 'MOVE_NOTE'; payload: { noteId: string; folderId: string | null } }
   | { type: 'PIN_NOTE'; payload: string }
   | { type: 'LOAD_VAULT'; payload: State }
-  | { type: 'CLEAR_VAULT' };
+  | { type: 'CLEAR_VAULT' }
+  | { type: 'MARK_SAVED' };
 
 export const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-
 export const VAULTS_KEY = 'flint-vaults';
 export const VAULT_DATA_PREFIX = 'flint-vault-';
 
-const defaultFolders: Folder[] = [
-  { id: 'folder-personal', name: 'Personal', parentId: null, collapsed: false },
-  { id: 'folder-work', name: 'Work', parentId: null, collapsed: false },
-  { id: 'folder-ideas', name: 'Ideas', parentId: null, collapsed: false },
-];
 
-const defaultNotes: Note[] = [
-  {
-    id: 'note-welcome',
-    title: 'Welcome to Flint',
-    content: `# Welcome to Flint
-
-A **local-first**, secure knowledge base that lives on your machine. Your thoughts, your data, your control.
-
-## Quick Start
-
-1. **Create notes** — Click the + icon in the sidebar or press \`Ctrl+N\`
-2. **Link notes** — Use \`[[double brackets]]\` to connect ideas, like [[Getting Started]]
-3. **Graph view** — Press \`Ctrl+G\` to visualize your knowledge graph
-4. **Search** — Press \`Ctrl+Shift+F\` to search across all notes
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| Markdown | Full GFM support with live preview |
-| Wiki Links | Connect notes with \`[[links]]\` |
-| Graph View | Interactive force-directed graph |
-| Local & Secure | All data stays on your machine |
-| Folders | Organize notes hierarchically |
-| Search | Instant full-text search |
-| Auto-save | Never lose your work |
-| Multi-vault | Separate workspaces for different projects |
-
-## Markdown Examples
-
-### Code
-\`\`\`bash
-# Install Flint
-bash install.sh
-
-# Update to latest version
-bash update.sh
-\`\`\`
-
-### Task List
-- [x] Install Flint
-- [x] Create first note
-- [ ] Build my knowledge graph
-
-### Blockquote
-> "The mind is not a vessel to be filled, but a fire to be kindled." — Plutarch
-
----
-
-*Start building your second brain — locally, securely, forever.*`,
-    folderId: null,
-    createdAt: Date.now() - 86400000,
-    updatedAt: Date.now() - 3600000,
-    pinned: true,
-    tags: ['welcome', 'start'],
-  },
-  {
-    id: 'note-started',
-    title: 'Getting Started',
-    content: `# Getting Started
-
-## Creating Notes
-
-Click the **+** icon in the sidebar or use \`Ctrl+N\`. Notes are automatically saved as you type.
-
-## Linking Notes
-
-Type \`[[note name]]\` to create a link to another note. If the note doesn't exist yet, the link will appear muted — click it to create the note.
-
-You can also use aliases: \`[[Welcome to Flint|the welcome page]]\`
-
-## Organization
-
-- **Folders** — Right-click in the sidebar to create folders
-- **Pinning** — Pin important notes for quick access
-- **Tags** — Add tags in your notes for categorization
-
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| \`Ctrl+N\` | New note |
-| \`Ctrl+E\` | Cycle view modes |
-| \`Ctrl+G\` | Graph view |
-| \`Ctrl+Shift+F\` | Search |
-| \`Ctrl+\\\` | Toggle sidebar |
-| \`Ctrl+S\` | Save |
-
-## Next Steps
-
-Check out [[Daily Notes]] and [[Project Ideas]] to see wiki links in action.`,
-    folderId: null,
-    createdAt: Date.now() - 80000000,
-    updatedAt: Date.now() - 2000000,
-    tags: ['guide'],
-  },
-  {
-    id: 'note-daily',
-    title: 'Daily Notes',
-    content: `# Daily Notes
-
-## Today's Tasks
-- [ ] Review [[Project Ideas]]
-- [ ] Update [[Meeting Notes]]
-- [ ] Write in [[Journal]]
-
-## Quick Thoughts
-Remember to connect new ideas back to [[Welcome to Flint]] for context.
-
-## References
-- [[Project Ideas]]
-- [[Meeting Notes]]
-- [[Journal]]
-- [[Getting Started]]`,
-    folderId: 'folder-personal',
-    createdAt: Date.now() - 72000000,
-    updatedAt: Date.now() - 1800000,
-    tags: ['daily'],
-  },
-  {
-    id: 'note-ideas',
-    title: 'Project Ideas',
-    content: `# Project Ideas
-
-## Web Projects
-1. **Knowledge Graph Visualizer** — Interactive graph of interconnected ideas
-2. **Markdown Editor** — Beautiful, distraction-free writing experience
-3. **Habit Tracker** — Daily habits with streak tracking
-
-## Learning Goals
-- Deep dive into [[Daily Notes]] patterns
-- Explore knowledge management systems
-- Build a personal wiki
-
-## Inspiration
-> The best way to predict the future is to invent it.
-
-See also: [[Welcome to Flint]] | [[Daily Notes]] | [[Getting Started]]`,
-    folderId: 'folder-ideas',
-    createdAt: Date.now() - 50000000,
-    updatedAt: Date.now() - 900000,
-    tags: ['ideas', 'projects'],
-  },
-  {
-    id: 'note-meeting',
-    title: 'Meeting Notes',
-    content: `# Meeting Notes
-
-## Standup — Monday
-**Attendees:** Team Alpha
-
-### Discussion Points
-1. Sprint progress review
-2. Blockers and dependencies
-3. Upcoming deadlines
-
-### Action Items
-- [ ] Follow up with design team
-- [ ] Update [[Project Ideas]] with feedback
-- [ ] Schedule next review
-
-## Links
-- [[Daily Notes]]
-- [[Project Ideas]]`,
-    folderId: 'folder-work',
-    createdAt: Date.now() - 30000000,
-    updatedAt: Date.now() - 600000,
-    tags: ['meeting', 'work'],
-  },
-  {
-    id: 'note-journal',
-    title: 'Journal',
-    content: `# Journal
-
-## Today's Reflections
-
-It's been a productive day. I spent time organizing my notes and creating meaningful connections between ideas.
-
-The [[Welcome to Flint|knowledge base]] is shaping up nicely. I can see the graph growing every day.
-
-### Gratitude
-- Good coffee
-- Productive workflow
-- New ideas for [[Project Ideas]]
-
-### Tomorrow's Focus
-- Continue with [[Daily Notes]]
-- Explore new connections in the graph view
-- Review [[Getting Started]] for any tips I missed`,
-    folderId: 'folder-personal',
-    createdAt: Date.now() - 20000000,
-    updatedAt: Date.now() - 300000,
-    tags: ['journal', 'personal'],
-  },
-];
 
 const initialState: State = {
-  notes: defaultNotes,
-  folders: defaultFolders,
-  activeNoteId: 'note-welcome',
-  openTabs: ['note-welcome'],
+  notes: [],
+  folders: [],
+  activeNoteId: null,
+  openTabs: [],
   viewMode: 'edit',
   showGraphView: false,
   showSearch: false,
   sidebarOpen: true,
   rightPanelOpen: false,
   activeVaultId: null,
+  lastSaved: null,
+  autoSaveEnabled: true,
 };
 
 function reducer(state: State, action: Action): State {
@@ -277,6 +81,7 @@ function reducer(state: State, action: Action): State {
             ? { ...n, ...action.payload, updatedAt: Date.now() }
             : n
         ),
+        lastSaved: null,
       };
 
     case 'DELETE_NOTE': {
@@ -378,7 +183,10 @@ function reducer(state: State, action: Action): State {
       return { ...action.payload, showSearch: false, showGraphView: false };
 
     case 'CLEAR_VAULT':
-      return { ...initialState, activeVaultId: null, showSearch: false, showGraphView: false };
+      return { ...initialState };
+
+    case 'MARK_SAVED':
+      return { ...state, lastSaved: Date.now() };
 
     default:
       return state;
@@ -402,7 +210,7 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | null>(null);
 
-function getEmptyVaultState(vaultId: string): State {
+function getNewVaultState(vaultId: string): State {
   return {
     notes: [{
       id: 'note-first',
@@ -415,6 +223,7 @@ This is your fresh workspace in **Flint**. Start writing, linking, and building 
 - Use \`[[double brackets]]\` to link notes
 - Press \`Ctrl+G\` for graph view
 - Press \`Ctrl+N\` for a new note
+- Auto-save is enabled — your work is always saved
 
 Happy writing!
 `,
@@ -432,12 +241,16 @@ Happy writing!
     sidebarOpen: true,
     rightPanelOpen: false,
     activeVaultId: vaultId,
+    lastSaved: Date.now(),
+    autoSaveEnabled: true,
   };
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const initializedRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [vaults, setVaults] = React.useState<Vault[]>(() => {
     try {
       const saved = localStorage.getItem(VAULTS_KEY);
@@ -445,58 +258,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch { return []; }
   });
 
-  // On mount: auto-open last vault or create a default one
+  // On mount: try to reopen last vault, but do NOT auto-create
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
-    if (state.activeVaultId) return; // already has a vault loaded
+    if (state.activeVaultId) return;
 
-    const savedVaults: Vault[] = (() => {
-      try {
-        const s = localStorage.getItem(VAULTS_KEY);
-        return s ? JSON.parse(s) : [];
-      } catch { return []; }
-    })();
-
-    if (savedVaults.length > 0) {
-      // Open the most recently used vault
-      const lastVault = [...savedVaults].sort((a, b) => b.lastOpened - a.lastOpened)[0];
-      try {
+    try {
+      const savedVaults: Vault[] = JSON.parse(localStorage.getItem(VAULTS_KEY) || '[]');
+      if (savedVaults.length > 0) {
+        const lastVault = [...savedVaults].sort((a, b) => b.lastOpened - a.lastOpened)[0];
         const saved = localStorage.getItem(VAULT_DATA_PREFIX + lastVault.id);
         if (saved) {
           const parsed = JSON.parse(saved);
-          dispatch({ type: 'LOAD_VAULT', payload: { ...parsed, activeVaultId: lastVault.id, showSearch: false, showGraphView: false } });
+          dispatch({ type: 'LOAD_VAULT', payload: { ...parsed, activeVaultId: lastVault.id } });
         } else {
-          dispatch({ type: 'LOAD_VAULT', payload: getEmptyVaultState(lastVault.id) });
+          dispatch({ type: 'LOAD_VAULT', payload: getNewVaultState(lastVault.id) });
         }
-      } catch {
-        dispatch({ type: 'LOAD_VAULT', payload: getEmptyVaultState(lastVault.id) });
       }
-    } else {
-      // Auto-create a default vault so the app opens immediately
-      const id = 'vault-default';
-      const defaultVault: Vault = {
-        id,
-        name: 'My Vault',
-        path: '~/.flint/vaults/my-vault',
-        createdAt: Date.now(),
-        lastOpened: Date.now(),
-        color: '#7c6df2',
-      };
-      setVaults([defaultVault]);
-      // Load default notes into this vault
-      dispatch({ type: 'LOAD_VAULT', payload: { ...initialState, activeVaultId: id } });
-    }
+      // If no vaults exist, user stays on vault screen — no auto-create
+    } catch { /* ignore */ }
   }, []);
 
-  // Save vault data on state changes
+  // Auto-save: debounce 800ms after any state change
   useEffect(() => {
     if (!state.activeVaultId) return;
-    try {
-      const toSave = { ...state, showSearch: false, showGraphView: false };
-      localStorage.setItem(VAULT_DATA_PREFIX + state.activeVaultId, JSON.stringify(toSave));
-    } catch { /* storage full */ }
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      try {
+        const toSave = { ...state, showSearch: false, showGraphView: false, lastSaved: Date.now() };
+        localStorage.setItem(VAULT_DATA_PREFIX + state.activeVaultId, JSON.stringify(toSave));
+        dispatch({ type: 'MARK_SAVED' });
+      } catch { /* storage full */ }
+    }, 800);
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
   }, [state]);
 
   // Save vaults list
@@ -504,7 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
   }, [vaults]);
 
-  const createVault = useCallback((name: string, color: string = '#7c6df2'): string => {
+  const createVault = useCallback((name: string, color: string = '#444444'): string => {
     const id = generateId();
     const vault: Vault = {
       id,
@@ -515,8 +311,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       color,
     };
     setVaults(prev => [...prev, vault]);
-    const vaultState = getEmptyVaultState(id);
-    dispatch({ type: 'LOAD_VAULT', payload: vaultState });
+    dispatch({ type: 'LOAD_VAULT', payload: getNewVaultState(id) });
     return id;
   }, []);
 
@@ -525,13 +320,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem(VAULT_DATA_PREFIX + vaultId);
       if (saved) {
         const parsed = JSON.parse(saved);
-        dispatch({ type: 'LOAD_VAULT', payload: { ...parsed, activeVaultId: vaultId, showSearch: false, showGraphView: false } });
+        dispatch({ type: 'LOAD_VAULT', payload: { ...parsed, activeVaultId: vaultId } });
       } else {
-        dispatch({ type: 'LOAD_VAULT', payload: getEmptyVaultState(vaultId) });
+        dispatch({ type: 'LOAD_VAULT', payload: getNewVaultState(vaultId) });
       }
       setVaults(prev => prev.map(v => v.id === vaultId ? { ...v, lastOpened: Date.now() } : v));
     } catch {
-      dispatch({ type: 'LOAD_VAULT', payload: getEmptyVaultState(vaultId) });
+      dispatch({ type: 'LOAD_VAULT', payload: getNewVaultState(vaultId) });
     }
   }, []);
 

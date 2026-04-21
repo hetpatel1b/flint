@@ -1,199 +1,152 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* ===== FLINT — Obsidian Dark Theme Clone ===== */
-:root {
-  --bg-primary: #1e1e2e;
-  --bg-secondary: #181825;
-  --bg-tertiary: #11111b;
-  --bg-hover: #252536;
-  --bg-active: #2a2a3c;
-  --bg-highlight: #313244;
-  --border: #2a2a3c;
-  --border-subtle: #232334;
-  --text-primary: #cdd6f4;
-  --text-secondary: #a6adc8;
-  --text-muted: #6c7086;
-  --text-faint: #45475a;
-  --accent: #7c6df2;
-  --accent-hover: #8b7ff3;
-  --accent-dim: #5b4ec9;
-  --accent-glow: rgba(124, 109, 242, 0.15);
-  --accent-subtle: rgba(124, 109, 242, 0.08);
-  --red: #f38ba8;
-  --green: #a6e3a1;
-  --yellow: #f9e2af;
-  --blue: #89b4fa;
-  --link: #7c6df2;
-  --tag-bg: #2a2a3c;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
-}
-
-* { box-sizing: border-box; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
   height: 100%;
-  margin: 0;
-  padding: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  background: #0a0a0a;
+  color: #999;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar — thin, subtle */
+::selection { background: #333; color: #fff; }
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-highlight); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #444; }
 
-::selection { background: rgba(124, 109, 242, 0.25); color: #fff; }
-
-/* ===== EDITOR ===== */
+/* Editor */
 .flint-editor {
   width: 100%;
   height: 100%;
-  background: transparent;
+  background: #0a0a0a;
+  color: #bbb;
   border: none;
   outline: none;
   resize: none;
-  color: var(--text-primary);
-  font-family: var(--font-mono);
+  padding: 40px 60px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', Menlo, monospace;
   font-size: 14px;
-  line-height: 1.75;
-  padding: 24px 40px;
+  line-height: 1.7;
   tab-size: 2;
-  caret-color: var(--accent);
+  caret-color: #666;
 }
-.flint-editor::placeholder { color: var(--text-faint); }
+.flint-editor::placeholder { color: #333; }
 
-/* ===== PREVIEW / MARKDOWN ===== */
+/* Preview */
 .flint-preview {
-  padding: 24px 40px;
-  font-size: 15px;
-  line-height: 1.8;
-  color: var(--text-primary);
-  overflow-y: auto;
-  height: 100%;
+  padding: 40px 60px;
+  color: #aaa;
+  line-height: 1.75;
+  font-size: 14px;
 }
-.flint-preview h1 {
-  font-size: 2em;
-  font-weight: 700;
-  margin: 0 0 0.5em 0;
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--border);
-  color: #fff;
-  letter-spacing: -0.02em;
-}
-.flint-preview h2 {
-  font-size: 1.5em;
-  font-weight: 600;
-  margin: 1.2em 0 0.5em 0;
-  color: #e8e8f0;
-}
-.flint-preview h3 { font-size: 1.2em; font-weight: 600; margin: 1em 0 0.4em 0; color: #ddd; }
-.flint-preview h4, .flint-preview h5, .flint-preview h6 { font-weight: 600; margin: 0.8em 0 0.3em 0; color: #ccc; }
-.flint-preview p { margin: 0.5em 0; }
-.flint-preview a {
-  color: var(--link);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.15s;
-}
-.flint-preview a:hover { border-bottom-color: var(--link); }
-.flint-preview strong { color: #fff; font-weight: 600; }
-.flint-preview em { color: var(--text-secondary); }
+.flint-preview h1 { font-size: 28px; font-weight: 700; color: #ddd; margin: 0 0 16px 0; letter-spacing: -0.5px; border-bottom: 1px solid #1a1a1a; padding-bottom: 12px; }
+.flint-preview h2 { font-size: 22px; font-weight: 600; color: #ccc; margin: 28px 0 12px 0; letter-spacing: -0.3px; }
+.flint-preview h3 { font-size: 17px; font-weight: 600; color: #bbb; margin: 24px 0 10px 0; }
+.flint-preview p { margin: 0 0 12px 0; }
+.flint-preview strong { color: #ccc; font-weight: 600; }
+.flint-preview em { color: #aaa; font-style: italic; }
+.flint-preview a, .flint-preview .wiki-link { color: #777; text-decoration: none; border-bottom: 1px solid #333; cursor: pointer; transition: color 0.15s; }
+.flint-preview a:hover, .flint-preview .wiki-link:hover { color: #bbb; }
+.flint-preview .wiki-link-unresolved { color: #444; border-bottom: 1px dashed #333; }
+.flint-preview .wiki-link-unresolved:hover { color: #666; }
 .flint-preview code {
-  background: var(--bg-highlight);
-  color: var(--accent);
-  padding: 0.15em 0.4em;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  background: #1a1a1a;
+  color: #999;
+  padding: 2px 6px;
   border-radius: 3px;
-  font-size: 0.875em;
-  font-family: var(--font-mono);
+  border: 1px solid #222;
 }
 .flint-preview pre {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: #0d0d0d;
+  border: 1px solid #1a1a1a;
   border-radius: 6px;
   padding: 16px;
+  margin: 12px 0;
   overflow-x: auto;
-  margin: 1em 0;
 }
 .flint-preview pre code {
   background: none;
+  border: none;
   padding: 0;
-  border-radius: 0;
-  color: var(--text-primary);
-  font-size: 13px;
+  color: #888;
+  font-size: 12px;
   line-height: 1.6;
 }
 .flint-preview blockquote {
-  border-left: 3px solid var(--accent);
-  margin: 1em 0;
-  padding: 0.5em 1em;
-  background: var(--accent-subtle);
-  border-radius: 0 4px 4px 0;
-  color: var(--text-secondary);
+  border-left: 2px solid #2a2a2a;
+  padding: 4px 16px;
+  margin: 12px 0;
+  color: #777;
+  background: #0d0d0d;
 }
-.flint-preview blockquote p { margin: 0.2em 0; }
-.flint-preview ul, .flint-preview ol { margin: 0.5em 0; padding-left: 1.5em; }
-.flint-preview li { margin: 0.2em 0; }
-.flint-preview li::marker { color: var(--text-muted); }
-.flint-preview hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
-.flint-preview img { max-width: 100%; border-radius: 6px; margin: 1em 0; }
-.flint-preview table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 14px; }
-.flint-preview th { background: var(--bg-tertiary); font-weight: 600; text-align: left; padding: 8px 12px; border: 1px solid var(--border); color: var(--text-primary); }
-.flint-preview td { padding: 8px 12px; border: 1px solid var(--border); color: var(--text-secondary); }
-.flint-preview tr:nth-child(even) { background: rgba(255,255,255,0.01); }
-.flint-preview input[type="checkbox"] { accent-color: var(--accent); margin-right: 6px; }
-
-/* Wiki links */
-.wiki-link {
-  color: var(--accent);
+.flint-preview ul, .flint-preview ol { padding-left: 24px; margin: 8px 0; }
+.flint-preview li { margin: 4px 0; }
+.flint-preview li::marker { color: #444; }
+.flint-preview hr { border: none; border-top: 1px solid #1a1a1a; margin: 24px 0; }
+.flint-preview table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.flint-preview th, .flint-preview td { border: 1px solid #1a1a1a; padding: 8px 12px; text-align: left; }
+.flint-preview th { background: #0d0d0d; color: #aaa; font-weight: 600; font-size: 12px; }
+.flint-preview td { color: #888; }
+.flint-preview img { max-width: 100%; border-radius: 6px; margin: 12px 0; }
+.flint-preview input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #333;
+  border-radius: 3px;
+  background: #111;
+  vertical-align: middle;
+  margin-right: 8px;
   cursor: pointer;
-  border-bottom: 1px dashed rgba(124, 109, 242, 0.3);
-  transition: all 0.15s;
-  padding: 0 1px;
+  position: relative;
 }
-.wiki-link:hover { color: var(--accent-hover); border-bottom-color: var(--accent-hover); }
-.wiki-link.unresolved {
-  color: var(--text-faint);
-  border-bottom-style: dotted;
-  opacity: 0.7;
+.flint-preview input[type="checkbox"]:checked {
+  background: #333;
+  border-color: #444;
 }
-.wiki-link.unresolved:hover { color: var(--text-muted); opacity: 1; }
+.flint-preview input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  color: #888;
+  font-size: 10px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
 
-/* ===== GRAPH VIEW ===== */
+/* Graph container */
 .flint-graph-container {
   position: fixed;
   inset: 0;
-  z-index: 100;
-  background: #0b0b14;
+  z-index: 50;
   display: flex;
   flex-direction: column;
+  background: #050505;
 }
 
-/* ===== ANIMATIONS ===== */
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-.animate-fade-in { animation: fadeIn 0.2s ease-out; }
-.animate-slide-in { animation: slideIn 0.2s ease-out; }
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
-/* ===== SYNTAX HIGHLIGHTING ===== */
-.hljs { background: var(--bg-tertiary) !important; color: #cdd6f4 !important; }
-.hljs-keyword { color: #cba6f7 !important; }
-.hljs-string { color: #a6e3a1 !important; }
-.hljs-number { color: #fab387 !important; }
-.hljs-comment { color: #585b70 !important; font-style: italic; }
-.hljs-function { color: #89b4fa !important; }
-.hljs-title { color: #89b4fa !important; }
-.hljs-built_in { color: #f9e2af !important; }
-.hljs-literal { color: #fab387 !important; }
-.hljs-type { color: #f9e2af !important; }
-.hljs-attr { color: #89dceb !important; }
-.hljs-variable { color: #f9e2af !important; }
-.hljs-selector-class { color: #a6e3a1 !important; }
-.hljs-selector-tag { color: #f38ba8 !important; }
-.hljs-attribute { color: #89dceb !important; }
+.animate-fade-in { animation: fadeIn 0.2s ease; }
+.animate-slide-in { animation: slideIn 0.2s ease; }
+.animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
