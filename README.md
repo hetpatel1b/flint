@@ -116,7 +116,7 @@ Flint is designed with privacy as a core principle:
 - **Local storage** — All data in your browser's localStorage
 - **Open source** — Audit the code yourself
 
-## 🛠️ Development
+## Development
 
 ```bash
 # Clone
