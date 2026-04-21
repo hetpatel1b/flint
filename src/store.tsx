@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { type Note, type Folder, type Vault, type ViewMode } from './types';
 
 interface State {
@@ -51,13 +51,13 @@ const defaultNotes: Note[] = [
   {
     id: 'note-welcome',
     title: 'Welcome to Flint',
-    content: `# Welcome to Flint 🔥
+    content: `# Welcome to Flint
 
 A **local-first**, secure knowledge base that lives on your machine. Your thoughts, your data, your control.
 
 ## Quick Start
 
-1. **Create notes** — Click **+** in the sidebar or press \`Ctrl+N\`
+1. **Create notes** — Click the + icon in the sidebar or press \`Ctrl+N\`
 2. **Link notes** — Use \`[[double brackets]]\` to connect ideas, like [[Getting Started]]
 3. **Graph view** — Press \`Ctrl+G\` to visualize your knowledge graph
 4. **Search** — Press \`Ctrl+Shift+F\` to search across all notes
@@ -66,14 +66,14 @@ A **local-first**, secure knowledge base that lives on your machine. Your though
 
 | Feature | Description |
 |---------|-------------|
-| 📝 Markdown | Full GFM support with live preview |
-| 🔗 Wiki Links | Connect notes with \`[[links]]\` |
-| 🌐 Graph View | Interactive force-directed graph |
-| 🔒 Local & Secure | All data stays on your machine |
-| 📁 Folders | Organize notes hierarchically |
-| 🔍 Search | Instant full-text search |
-| 💾 Auto-save | Never lose your work |
-| 🏪 Multi-vault | Separate workspaces for different projects |
+| Markdown | Full GFM support with live preview |
+| Wiki Links | Connect notes with \`[[links]]\` |
+| Graph View | Interactive force-directed graph |
+| Local & Secure | All data stays on your machine |
+| Folders | Organize notes hierarchically |
+| Search | Instant full-text search |
+| Auto-save | Never lose your work |
+| Multi-vault | Separate workspaces for different projects |
 
 ## Markdown Examples
 
@@ -96,8 +96,7 @@ bash update.sh
 
 ---
 
-*Start building your second brain — locally, securely, forever.*
-`,
+*Start building your second brain — locally, securely, forever.*`,
     folderId: null,
     createdAt: Date.now() - 86400000,
     updatedAt: Date.now() - 3600000,
@@ -134,12 +133,11 @@ You can also use aliases: \`[[Welcome to Flint|the welcome page]]\`
 | \`Ctrl+G\` | Graph view |
 | \`Ctrl+Shift+F\` | Search |
 | \`Ctrl+\\\` | Toggle sidebar |
-| \`Ctrl+S\` | Force save |
+| \`Ctrl+S\` | Save |
 
 ## Next Steps
 
-Check out [[Daily Notes]] and [[Project Ideas]] to see wiki links in action.
-`,
+Check out [[Daily Notes]] and [[Project Ideas]] to see wiki links in action.`,
     folderId: null,
     createdAt: Date.now() - 80000000,
     updatedAt: Date.now() - 2000000,
@@ -162,8 +160,7 @@ Remember to connect new ideas back to [[Welcome to Flint]] for context.
 - [[Project Ideas]]
 - [[Meeting Notes]]
 - [[Journal]]
-- [[Getting Started]]
-`,
+- [[Getting Started]]`,
     folderId: 'folder-personal',
     createdAt: Date.now() - 72000000,
     updatedAt: Date.now() - 1800000,
@@ -172,7 +169,7 @@ Remember to connect new ideas back to [[Welcome to Flint]] for context.
   {
     id: 'note-ideas',
     title: 'Project Ideas',
-    content: `# Project Ideas 💡
+    content: `# Project Ideas
 
 ## Web Projects
 1. **Knowledge Graph Visualizer** — Interactive graph of interconnected ideas
@@ -187,8 +184,7 @@ Remember to connect new ideas back to [[Welcome to Flint]] for context.
 ## Inspiration
 > The best way to predict the future is to invent it.
 
-See also: [[Welcome to Flint]] | [[Daily Notes]] | [[Getting Started]]
-`,
+See also: [[Welcome to Flint]] | [[Daily Notes]] | [[Getting Started]]`,
     folderId: 'folder-ideas',
     createdAt: Date.now() - 50000000,
     updatedAt: Date.now() - 900000,
@@ -214,8 +210,7 @@ See also: [[Welcome to Flint]] | [[Daily Notes]] | [[Getting Started]]
 
 ## Links
 - [[Daily Notes]]
-- [[Project Ideas]]
-`,
+- [[Project Ideas]]`,
     folderId: 'folder-work',
     createdAt: Date.now() - 30000000,
     updatedAt: Date.now() - 600000,
@@ -224,7 +219,7 @@ See also: [[Welcome to Flint]] | [[Daily Notes]] | [[Getting Started]]
   {
     id: 'note-journal',
     title: 'Journal',
-    content: `# Journal 📝
+    content: `# Journal
 
 ## Today's Reflections
 
@@ -233,15 +228,14 @@ It's been a productive day. I spent time organizing my notes and creating meanin
 The [[Welcome to Flint|knowledge base]] is shaping up nicely. I can see the graph growing every day.
 
 ### Gratitude
-- Good coffee ☕
+- Good coffee
 - Productive workflow
 - New ideas for [[Project Ideas]]
 
 ### Tomorrow's Focus
 - Continue with [[Daily Notes]]
 - Explore new connections in the graph view
-- Review [[Getting Started]] for any tips I missed
-`,
+- Review [[Getting Started]] for any tips I missed`,
     folderId: 'folder-personal',
     createdAt: Date.now() - 20000000,
     updatedAt: Date.now() - 300000,
@@ -300,10 +294,7 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'ADD_FOLDER':
-      return {
-        ...state,
-        folders: [...state.folders, action.payload],
-      };
+      return { ...state, folders: [...state.folders, action.payload] };
 
     case 'RENAME_FOLDER':
       return {
@@ -401,7 +392,6 @@ interface StoreContextType {
   extractLinks: (content: string) => string[];
   getBacklinks: (noteId: string) => Note[];
   getNoteByTitle: (title: string) => Note | undefined;
-  // Vault management
   vaults: Vault[];
   createVault: (name: string, color?: string) => string;
   openVault: (vaultId: string) => void;
@@ -417,7 +407,7 @@ function getEmptyVaultState(vaultId: string): State {
     notes: [{
       id: 'note-first',
       title: 'Welcome to your Vault',
-      content: `# Welcome to your new vault 🔥
+      content: `# Welcome to your new vault
 
 This is your fresh workspace in **Flint**. Start writing, linking, and building your knowledge graph.
 
@@ -447,6 +437,7 @@ Happy writing!
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const initializedRef = useRef(false);
   const [vaults, setVaults] = React.useState<Vault[]>(() => {
     try {
       const saved = localStorage.getItem(VAULTS_KEY);
@@ -454,15 +445,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } catch { return []; }
   });
 
-  // Load last active vault on mount
+  // On mount: auto-open last vault or create a default one
   useEffect(() => {
-    if (vaults.length > 0 && !state.activeVaultId) {
-      const lastVault = [...vaults].sort((a, b) => b.lastOpened - a.lastOpened)[0];
-      openVault(lastVault.id);
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    if (state.activeVaultId) return; // already has a vault loaded
+
+    const savedVaults: Vault[] = (() => {
+      try {
+        const s = localStorage.getItem(VAULTS_KEY);
+        return s ? JSON.parse(s) : [];
+      } catch { return []; }
+    })();
+
+    if (savedVaults.length > 0) {
+      // Open the most recently used vault
+      const lastVault = [...savedVaults].sort((a, b) => b.lastOpened - a.lastOpened)[0];
+      try {
+        const saved = localStorage.getItem(VAULT_DATA_PREFIX + lastVault.id);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          dispatch({ type: 'LOAD_VAULT', payload: { ...parsed, activeVaultId: lastVault.id, showSearch: false, showGraphView: false } });
+        } else {
+          dispatch({ type: 'LOAD_VAULT', payload: getEmptyVaultState(lastVault.id) });
+        }
+      } catch {
+        dispatch({ type: 'LOAD_VAULT', payload: getEmptyVaultState(lastVault.id) });
+      }
+    } else {
+      // Auto-create a default vault so the app opens immediately
+      const id = 'vault-default';
+      const defaultVault: Vault = {
+        id,
+        name: 'My Vault',
+        path: '~/.flint/vaults/my-vault',
+        createdAt: Date.now(),
+        lastOpened: Date.now(),
+        color: '#7c6df2',
+      };
+      setVaults([defaultVault]);
+      // Load default notes into this vault
+      dispatch({ type: 'LOAD_VAULT', payload: { ...initialState, activeVaultId: id } });
     }
   }, []);
 
-  // Save vault data whenever state changes (if vault is active)
+  // Save vault data on state changes
   useEffect(() => {
     if (!state.activeVaultId) return;
     try {
@@ -476,7 +504,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(VAULTS_KEY, JSON.stringify(vaults));
   }, [vaults]);
 
-  const createVault = useCallback((name: string, color: string = '#f59e0b'): string => {
+  const createVault = useCallback((name: string, color: string = '#7c6df2'): string => {
     const id = generateId();
     const vault: Vault = {
       id,

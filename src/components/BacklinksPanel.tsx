@@ -17,41 +17,46 @@ export function BacklinksPanel() {
     .filter((n): n is NonNullable<typeof n> => n !== undefined);
 
   return (
-    <div className="w-56 bg-[#0a0a0a] border-l border-[#1a1a1a] flex flex-col shrink-0 overflow-hidden">
-      <div className="px-3 py-3 border-b border-[#1a1a1a]">
-        <h3 className="text-[10px] font-semibold text-[#555] uppercase tracking-widest">Backlinks</h3>
+    <div className="flex flex-col shrink-0 overflow-hidden" style={{ width: 220, background: '#181825', borderLeft: '1px solid #232334' }}>
+      <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #232334' }}>
+        <h3 className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#6c7086' }}>Backlinks</h3>
       </div>
       <div className="flex-1 overflow-y-auto">
         {backlinks.length === 0 ? (
-          <div className="px-3 py-6 text-center text-[10px] text-[#333]">No backlinks yet</div>
+          <div className="px-3 py-6 text-center text-[10px]" style={{ color: '#313244' }}>No backlinks yet</div>
         ) : (
           backlinks.map(note => (
             <div
               key={note.id}
-              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[#111] transition-colors text-xs text-[#777] hover:text-[#bbb]"
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors text-xs"
+              style={{ color: '#a6adc8' }}
               onClick={() => dispatch({ type: 'OPEN_TAB', payload: note.id })}
+              onMouseEnter={e => { e.currentTarget.style.background = '#1e1e2e'; e.currentTarget.style.color = '#cdd6f4'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#a6adc8'; }}
             >
-              <ArrowRight size={10} className="text-[#f59e0b] shrink-0" />
+              <ArrowRight size={10} style={{ color: '#7c6df2' }} className="shrink-0" />
               <span className="truncate">{note.title}</span>
             </div>
           ))
         )}
       </div>
 
-      {/* Outgoing links */}
       {outgoingNotes.length > 0 && (
         <>
-          <div className="px-3 py-3 border-t border-b border-[#1a1a1a]">
-            <h3 className="text-[10px] font-semibold text-[#555] uppercase tracking-widest">Outgoing</h3>
+          <div className="px-3 py-2.5" style={{ borderTop: '1px solid #232334', borderBottom: '1px solid #232334' }}>
+            <h3 className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#6c7086' }}>Outgoing</h3>
           </div>
           <div className="overflow-y-auto">
             {outgoingNotes.map(note => (
               <div
                 key={note.id}
-                className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[#111] transition-colors text-xs text-[#777] hover:text-[#bbb]"
+                className="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors text-xs"
+                style={{ color: '#a6adc8' }}
                 onClick={() => dispatch({ type: 'OPEN_TAB', payload: note.id })}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1e1e2e'; e.currentTarget.style.color = '#cdd6f4'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#a6adc8'; }}
               >
-                <Link size={10} className="text-[#444] shrink-0" />
+                <Link size={10} style={{ color: '#45475a' }} className="shrink-0" />
                 <span className="truncate">{note.title}</span>
               </div>
             ))}

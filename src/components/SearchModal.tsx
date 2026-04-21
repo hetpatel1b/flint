@@ -40,11 +40,11 @@ export function SearchModal() {
 
   return (
     <div className="fixed inset-0 z-[150] flex items-start justify-center pt-[15vh]">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => dispatch({ type: 'TOGGLE_SEARCH' })} />
-      <div className="relative w-full max-w-lg bg-[#0f0f0f] border border-[#1e1e1e] rounded-xl shadow-2xl overflow-hidden animate-slide-in">
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }} onClick={() => dispatch({ type: 'TOGGLE_SEARCH' })} />
+      <div className="relative w-full max-w-lg rounded-lg shadow-2xl overflow-hidden animate-slide-in" style={{ background: '#1e1e2e', border: '1px solid #313244' }}>
         {/* Search input */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#1a1a1a]">
-          <Search size={14} className="text-[#555]" />
+        <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid #232334' }}>
+          <Search size={14} style={{ color: '#6c7086' }} />
           <input
             ref={inputRef}
             type="text"
@@ -52,35 +52,37 @@ export function SearchModal() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search notes..."
-            className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-[#444]"
+            className="flex-1 bg-transparent border-none outline-none text-sm text-white placeholder-[#45475a]"
           />
-          <kbd className="text-[10px] text-[#444] bg-[#1a1a1a] px-1.5 py-0.5 rounded">ESC</kbd>
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded" style={{ color: '#45475a', background: '#181825' }}>ESC</kbd>
         </div>
 
         {/* Results */}
         <div className="max-h-[300px] overflow-y-auto">
           {query.trim() && results.length === 0 && (
-            <div className="px-4 py-8 text-center text-xs text-[#444]">
+            <div className="px-4 py-8 text-center text-xs" style={{ color: '#45475a' }}>
               No results for "{query}"
             </div>
           )}
           {results.map((note, idx) => (
             <div
               key={note.id}
-              className={`flex items-center gap-2 px-4 py-2.5 cursor-pointer transition-colors ${
-                idx === selectedIndex ? 'bg-[#f59e0b]/10 text-[#f59e0b]' : 'text-[#888] hover:bg-[#1a1a1a]'
-              }`}
+              className="flex items-center gap-2 px-4 py-2.5 cursor-pointer transition-colors"
+              style={{
+                background: idx === selectedIndex ? 'rgba(124,109,242,0.1)' : 'transparent',
+                color: idx === selectedIndex ? '#cdd6f4' : '#a6adc8',
+              }}
               onClick={() => {
                 dispatch({ type: 'OPEN_TAB', payload: note.id });
                 dispatch({ type: 'TOGGLE_SEARCH' });
               }}
               onMouseEnter={() => setSelectedIndex(idx)}
             >
-              <FileText size={12} className={idx === selectedIndex ? 'text-[#f59e0b]' : 'text-[#333]'} />
+              <FileText size={12} style={{ color: idx === selectedIndex ? '#7c6df2' : '#45475a' }} />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium truncate">{note.title}</div>
                 {note.content && (
-                  <div className="text-[10px] text-[#444] truncate mt-0.5">
+                  <div className="text-[10px] truncate mt-0.5" style={{ color: '#45475a' }}>
                     {note.content.substring(0, 80).replace(/[#*_\[\]]/g, '')}
                   </div>
                 )}
@@ -91,7 +93,7 @@ export function SearchModal() {
 
         {/* Footer */}
         {results.length > 0 && (
-          <div className="px-4 py-2 border-t border-[#1a1a1a] flex items-center gap-3 text-[10px] text-[#444]">
+          <div className="px-4 py-2 flex items-center gap-3 text-[10px]" style={{ borderTop: '1px solid #232334', color: '#45475a' }}>
             <span>↑↓ Navigate</span>
             <span>↵ Open</span>
             <span>Esc Close</span>
