@@ -8,7 +8,7 @@
 #  ╚═╝     ╚═╝╚═╝     
 #
 #  Flint — Local-first Vault Installer
-#  https://github.com/flint-vault/flint
+#  https://github.com/Chintanpatel24/flint
 #
 
 set -euo pipefail
@@ -22,7 +22,7 @@ NC='\033[0m'
 
 FLINT_DIR="$HOME/.flint"
 FLINT_BIN="$FLINT_DIR/bin"
-REPO_URL="${FLINT_REPO_URL:-https://github.com/flint-vault/flint.git}"
+REPO_URL="${FLINT_REPO_URL:-https://github.com/Chintanpatel24/flint.git}"
 
 echo ""
 echo -e "${CYAN}$(cat <<'ASCII'
