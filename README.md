@@ -48,14 +48,14 @@ A **secure, local-first knowledge base** with AI-powered intelligence. Your note
 
 ### Install
 ```bash
-git clone https://github.com/your-username/flint.git
+git clone https://github.com/Chintanpatel24/flint.git
 cd flint
 bash install.sh
 ```
 
 ### One-liner
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/your-username/flint/main/install.sh)
+bash <(curl -sL https://raw.githubusercontent.com/Chintanpatel24/flint/main/install.sh)
 ```
 
 After install, Flint appears in your **app menu**. Or run `flint` from terminal.
