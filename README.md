@@ -2,6 +2,7 @@
   <img src="public/flint-logo.png" style="width: 10%; height: auto;">
 </div>   
 
+---
 
 # ⬡ Flint
 
