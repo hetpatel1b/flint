@@ -250,7 +250,7 @@ function getInitialState(): AppState {
     notes: DEMO_NOTES, folders: DEMO_FOLDERS,
     openTabs: ['n1'], activeNoteId: 'n1',
     viewMode: 'edit', sidebarOpen: true, rightPanelOpen: false,
-    showGraphView: false, showSearch: false, showCommandPalette: false,
+    showGraphView: false, showSearch: false, showCommandPalette: false, settingsOpen: false,
   };
 }
 
@@ -276,7 +276,8 @@ type Action =
   | { type: 'TOGGLE_RIGHT_PANEL' }
   | { type: 'TOGGLE_GRAPH_VIEW' }
   | { type: 'TOGGLE_SEARCH' }
-  | { type: 'TOGGLE_COMMAND_PALETTE' };
+  | { type: 'TOGGLE_COMMAND_PALETTE' }
+  | { type: 'TOGGLE_SETTINGS' };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -331,6 +332,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'TOGGLE_GRAPH_VIEW': return { ...state, showGraphView: !state.showGraphView };
     case 'TOGGLE_SEARCH': return { ...state, showSearch: !state.showSearch };
     case 'TOGGLE_COMMAND_PALETTE': return { ...state, showCommandPalette: !state.showCommandPalette };
+    case 'TOGGLE_SETTINGS': return { ...state, settingsOpen: !state.settingsOpen };
     default: return state;
   }
 }

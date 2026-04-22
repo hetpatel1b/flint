@@ -25,6 +25,15 @@ export interface Vault {
 
 export type ViewMode = 'edit' | 'split' | 'preview';
 
+export interface FlintSettings {
+  fontSize: number;
+  spellCheck: boolean;
+  autoSave: boolean;
+  showLineNumbers: boolean;
+  tabSize: number;
+  wordWrap: boolean;
+}
+
 export interface AppState {
   vaults: Vault[];
   activeVaultId: string | null;
@@ -38,4 +47,5 @@ export interface AppState {
   showGraphView: boolean;
   showSearch: boolean;
   showCommandPalette: boolean;
+  settingsOpen: boolean;
 }

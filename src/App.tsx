@@ -9,11 +9,12 @@ import { SearchModal } from './components/SearchModal';
 import { StatusBar } from './components/StatusBar';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { VaultScreen } from './components/VaultScreen';
+import { SettingsPanel } from './components/Settings';
 import {
   PanelLeftOpen, PenLine, Eye, Columns2,
   PanelRightOpen, PanelRightClose, Plus, Waypoints, Search,
   Bold, Italic, Code, List, Link2, Heading2, Quote,
-  Command, FolderPlus, Settings, Hash,
+  Command, FolderPlus, Settings, Hash, Brackets,
 } from 'lucide-react';
 
 function CommandPalette() {
@@ -32,6 +33,7 @@ function CommandPalette() {
     { icon: <Columns2 size={14} />, label: 'Switch to split view', action: () => { dispatch({ type: 'SET_VIEW_MODE', payload: 'split' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
     { icon: <PanelLeftOpen size={14} />, label: 'Toggle sidebar', action: () => { dispatch({ type: 'TOGGLE_SIDEBAR' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
     { icon: <PanelRightOpen size={14} />, label: 'Toggle right panel', action: () => { dispatch({ type: 'TOGGLE_RIGHT_PANEL' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Settings size={14} />, label: 'Open settings', action: () => { dispatch({ type: 'TOGGLE_SETTINGS' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
   ];
 
   const filtered = query.trim() ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase())) : commands;
@@ -76,7 +78,17 @@ function CommandPalette() {
 
 function AppContent() {
   const { state, dispatch, createNote } = useStore();
-  const { activeNoteId, viewMode, showGraphView, showSearch, showCommandPalette, sidebarOpen, rightPanelOpen, activeVaultId } = state;
+  const { activeNoteId, viewMode, showGraphView, showSearch, showCommandPalette, sidebarOpen, rightPanelOpen, activeVaultId, settingsOpen } = state;
+
+  // Dynamic style tag for settings
+  useEffect(() => {
+    let el = document.getElementById('flint-dynamic-style');
+    if (!el) {
+      el = document.createElement('style');
+      el.id = 'flint-dynamic-style';
+      document.head.appendChild(el);
+    }
+  }, []);
 
   // ALL hooks before any conditional return
   useEffect(() => {
@@ -92,6 +104,7 @@ function AppContent() {
         else dispatch({ type: 'SET_VIEW_MODE', payload: 'edit' });
       }
       if ((e.ctrlKey || e.metaKey) && e.key === '\\') { e.preventDefault(); dispatch({ type: 'TOGGLE_SIDEBAR' }); }
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); dispatch({ type: 'TOGGLE_SETTINGS' }); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -100,6 +113,10 @@ function AppContent() {
   if (!activeVaultId) return <VaultScreen />;
 
   const activeNote = state.notes.find(n => n.id === activeNoteId);
+
+  const format = (type: string) => {
+    window.dispatchEvent(new CustomEvent('flint-format', { detail: { type } }));
+  };
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#0a0a0a' }}>
@@ -123,7 +140,8 @@ function AppContent() {
 
           <RibbonBtn icon={rightPanelOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />} active={rightPanelOpen}
             onClick={() => dispatch({ type: 'TOGGLE_RIGHT_PANEL' })} title="Toggle right panel" />
-          <RibbonBtn icon={<Settings size={16} />} title="Settings" onClick={() => {}} />
+          <RibbonBtn icon={<Settings size={16} />} active={settingsOpen}
+            onClick={() => dispatch({ type: 'TOGGLE_SETTINGS' })} title="Settings (Ctrl+,)" />
         </div>
 
         {/* Sidebar */}
@@ -186,19 +204,21 @@ function AppContent() {
                 </div>
               </div>
 
-              {/* Formatting toolbar */}
+              {/* Formatting toolbar — buttons now work! */}
               <div className="flex items-center gap-0.5 px-4 shrink-0" style={{ height: 32, borderBottom: '1px solid #1a1a1a', background: '#0a0a0a' }}>
                 {[
-                  { icon: <Bold size={13} />, title: 'Bold' },
-                  { icon: <Italic size={13} />, title: 'Italic' },
-                  { icon: <Heading2 size={13} />, title: 'Heading' },
-                  { icon: <Quote size={13} />, title: 'Quote' },
-                  { icon: <Code size={13} />, title: 'Code' },
-                  { icon: <Link2 size={13} />, title: 'Link' },
-                  { icon: <List size={13} />, title: 'List' },
-                  { icon: <Hash size={13} />, title: 'Tag' },
-                ].map((btn, i) => (
-                  <button key={i} title={btn.title}
+                  { icon: <Bold size={13} />, title: 'Bold', fmt: 'bold' },
+                  { icon: <Italic size={13} />, title: 'Italic', fmt: 'italic' },
+                  { icon: <Heading2 size={13} />, title: 'Heading', fmt: 'heading' },
+                  { icon: <Quote size={13} />, title: 'Quote', fmt: 'quote' },
+                  { icon: <Code size={13} />, title: 'Code', fmt: 'code' },
+                  { icon: <Link2 size={13} />, title: 'Link', fmt: 'link' },
+                  { icon: <List size={13} />, title: 'List', fmt: 'list' },
+                  { icon: <Brackets size={13} />, title: 'Wiki Link', fmt: 'wikilink' },
+                  { icon: <Hash size={13} />, title: 'Tag', fmt: 'tag' },
+                ].map((btn) => (
+                  <button key={btn.fmt} title={btn.title}
+                    onClick={() => format(btn.fmt)}
                     style={{ padding: '3px 5px', background: 'none', border: 'none', color: '#333', cursor: 'pointer', borderRadius: 3, display: 'flex', alignItems: 'center', transition: 'all 0.1s' }}
                     onMouseEnter={e => { e.currentTarget.style.background = '#141414'; e.currentTarget.style.color = '#888'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#333'; }}>
@@ -235,6 +255,7 @@ function AppContent() {
       {showGraphView && <GraphView />}
       {showSearch && <SearchModal />}
       {showCommandPalette && <CommandPalette />}
+      {settingsOpen && <SettingsPanel />}
     </div>
   );
 }

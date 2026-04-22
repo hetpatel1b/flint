@@ -3,71 +3,75 @@
 BOLD='\033[1m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-WHITE='\033[0;37m'
-GRAY='\033[0;90m'
 NC='\033[0m'
 
 FLINT_DIR="$HOME/.flint"
+FLINT_BIN="/usr/local/bin/flint"
+DESKTOP_FILE="$HOME/.local/share/applications/flint.desktop"
 
 echo ""
-echo -e "${BOLD}${WHITE}  🪨  Flint Uninstaller${NC}"
+echo -e "${BOLD}⬡ Flint Uninstaller${NC}"
+echo ""
+echo -e "This will remove:"
+echo -e "  • All vaults and notes"
+echo -e "  • Application files"
+echo -e "  • Desktop entry"
+echo -e "  • CLI command"
 echo ""
 
-if [ ! -d "$FLINT_DIR" ]; then
-    echo -e "  ${GRAY}Flint is not installed.${NC}"
-    exit 0
-fi
-
-echo -e "  ${RED}This will remove Flint and all your vaults.${NC}"
-echo -e "  ${GRAY}All notes and data in $FLINT_DIR will be deleted.${NC}"
+# Confirm
+read -p "Are you sure you want to uninstall Flint? [y/N] " -n 1 -r
 echo ""
-read -p "  Are you sure? [y/N] " -n 1 -r
-echo ""
-
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "  ${GREEN}Cancelled.${NC}"
+    echo "Cancelled."
     exit 0
 fi
 
-echo ""
-echo -e "${GRAY}  Removing Flint...${NC}"
-
-# Kill any running instance
-pkill -f "flint" 2>/dev/null || true
+# Kill running processes
+echo -e "Stopping Flint processes..."
+pkill -f "electron.*flint" 2>/dev/null || true
+pkill -f "flint-desktop" 2>/dev/null || true
+pkill -f "flint-server" 2>/dev/null || true
+pkill -f "python3 -m http.server 4777" 2>/dev/null || true
 sleep 1
 
-# Remove app directory
-rm -rf "$FLINT_DIR"
-echo -e "  ${GREEN}✓${NC} Removed $FLINT_DIR"
-
-# Remove CLI symlink
-if [ -L /usr/local/bin/flint ]; then
-    if [ -w /usr/local/bin ]; then
-        rm /usr/local/bin/flint
-    else
-        sudo rm /usr/local/bin/flint
-    fi
-    echo -e "  ${GREEN}✓${NC} Removed /usr/local/bin/flint"
+# Remove desktop entry
+if [ -f "$DESKTOP_FILE" ]; then
+    rm -f "$DESKTOP_FILE"
+    update-desktop-database ~/.local/share/applications/ 2>/dev/null || true
+    echo -e "  ✓ Removed desktop entry"
 fi
 
-# Remove .desktop file
-rm -f "$HOME/.local/share/applications/flint.desktop" 2>/dev/null
-echo -e "  ${GREEN}✓${NC} Removed app menu entry"
-
-# Update desktop database
-if command -v update-desktop-database &> /dev/null; then
-    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+# Remove CLI command
+if [ -f "$FLINT_BIN" ]; then
+    sudo rm -f "$FLINT_BIN"
+    echo -e "  ✓ Removed CLI command"
 fi
 
-# Remove from PATH in shell configs
+# Ask about data
+read -p "Also delete all vault data and notes? [y/N] " -n 1 -r
+echo ""
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    rm -rf "$FLINT_DIR"
+    echo -e "  ✓ Removed all data"
+else
+    # Keep data, just remove app
+    rm -rf "$FLINT_DIR/src"
+    rm -rf "$FLINT_DIR/node_modules"
+    rm -f "$FLINT_DIR/flint-desktop.sh"
+    rm -f "$FLINT_DIR/flint-server.sh"
+    rm -f "$FLINT_DIR/package.json"
+    rm -f "$FLINT_DIR/package-lock.json"
+    echo -e "  ${GREEN}Vault data preserved at $FLINT_DIR/vaults${NC}"
+fi
+
+# Clean shell config
 for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
-    if [ -f "$rc" ]; then
-        sed -i '/# Flint/d' "$rc" 2>/dev/null || true
-        sed -i '/flint\/bin/d' "$rc" 2>/dev/null || true
+    if [ -f "$rc" ] && grep -q "flint" "$rc" 2>/dev/null; then
+        sed -i '/flint/d' "$rc" 2>/dev/null || true
     fi
 done
-echo -e "  ${GREEN}✓${NC} Cleaned shell config"
 
 echo ""
-echo -e "${BOLD}${GREEN}  ✅ Flint has been completely removed.${NC}"
+echo -e "${GREEN}✓ Flint has been uninstalled${NC}"
 echo ""

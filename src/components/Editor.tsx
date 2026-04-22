@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 
 export function Editor({ noteId }: { noteId: string }) {
@@ -13,12 +13,12 @@ export function Editor({ noteId }: { noteId: string }) {
     }
   }, [noteId, note]);
 
-  if (!note) return null;
-
-  const handleChange = (val: string) => {
+  const save = useCallback((val: string) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => dispatch({ type: 'UPDATE_NOTE', payload: { id: noteId, content: val } }), 500);
-  };
+  }, [dispatch, noteId]);
+
+  const handleChange = (val: string) => { save(val); };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Tab') {
@@ -31,6 +31,115 @@ export function Editor({ noteId }: { noteId: string }) {
       handleChange(ta.value);
     }
   };
+
+  // Listen for formatting events from toolbar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent;
+      const ta = taRef.current;
+      if (!ta) return;
+      const fmt = ce.detail?.type as string;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const val = ta.value;
+      const selected = val.substring(start, end);
+      const before = val.substring(0, start);
+      const after = val.substring(end);
+
+      let newVal = val;
+      let cursorStart = start;
+      let cursorEnd = end;
+
+      switch (fmt) {
+        case 'bold': {
+          newVal = before + '**' + selected + '**' + after;
+          cursorStart = start + 2;
+          cursorEnd = end + 2;
+          break;
+        }
+        case 'italic': {
+          newVal = before + '*' + selected + '*' + after;
+          cursorStart = start + 1;
+          cursorEnd = end + 1;
+          break;
+        }
+        case 'heading': {
+          // Find beginning of current line
+          const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+          const lineEnd = val.indexOf('\n', end);
+          const line = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+          const prefix = line.startsWith('# ') ? '' : '# ';
+          newVal = val.substring(0, lineStart) + prefix + line + val.substring(lineEnd === -1 ? val.length : lineEnd);
+          cursorStart = start + (line.startsWith('# ') ? -2 : 2);
+          cursorEnd = end + (line.startsWith('# ') ? -2 : 2);
+          break;
+        }
+        case 'quote': {
+          const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+          const lineEnd = val.indexOf('\n', end);
+          const line = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+          const prefix = line.startsWith('> ') ? '' : '> ';
+          newVal = val.substring(0, lineStart) + prefix + line + val.substring(lineEnd === -1 ? val.length : lineEnd);
+          cursorStart = start + (line.startsWith('> ') ? -2 : 2);
+          cursorEnd = end + (line.startsWith('> ') ? -2 : 2);
+          break;
+        }
+        case 'code': {
+          if (selected.includes('\n')) {
+            newVal = before + '```\n' + selected + '\n```' + after;
+            cursorStart = start + 4;
+            cursorEnd = end + 4;
+          } else {
+            newVal = before + '`' + selected + '`' + after;
+            cursorStart = start + 1;
+            cursorEnd = end + 1;
+          }
+          break;
+        }
+        case 'link': {
+          const text = selected || 'link text';
+          newVal = before + '[' + text + '](url)' + after;
+          cursorStart = start + 1;
+          cursorEnd = start + 1 + text.length;
+          break;
+        }
+        case 'list': {
+          const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+          const lineEnd = val.indexOf('\n', end);
+          const line = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+          const prefix = line.startsWith('- ') ? '' : '- ';
+          newVal = val.substring(0, lineStart) + prefix + line + val.substring(lineEnd === -1 ? val.length : lineEnd);
+          cursorStart = start + (line.startsWith('- ') ? -2 : 2);
+          cursorEnd = end + (line.startsWith('- ') ? -2 : 2);
+          break;
+        }
+        case 'tag': {
+          newVal = before + '#' + selected + after;
+          cursorStart = start + 1;
+          cursorEnd = end + 1;
+          break;
+        }
+        case 'wikilink': {
+          const text = selected || 'note name';
+          newVal = before + '[[' + text + ']]' + after;
+          cursorStart = start + 2;
+          cursorEnd = start + 2 + text.length;
+          break;
+        }
+      }
+
+      ta.value = newVal;
+      ta.selectionStart = cursorStart;
+      ta.selectionEnd = cursorEnd;
+      ta.focus();
+      handleChange(newVal);
+    };
+
+    window.addEventListener('flint-format', handler);
+    return () => window.removeEventListener('flint-format', handler);
+  }, [noteId]);
+
+  if (!note) return null;
 
   return (
     <textarea ref={taRef} className="flint-editor"

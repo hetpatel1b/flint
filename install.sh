@@ -1,184 +1,170 @@
 #!/usr/bin/env bash
 set -e
 
-# ─────────────────────────────────────────
-# Flint — Local Knowledge Base Installer
-# ─────────────────────────────────────────
+# ============================
+# Flint — Install Script
+# ============================
 
 BOLD='\033[1m'
 DIM='\033[2m'
 GREEN='\033[0;32m'
-WHITE='\033[0;37m'
-GRAY='\033[0;90m'
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m'
 
 FLINT_DIR="$HOME/.flint"
-REPO_URL="https://github.com/flint-editor/flint.git"
+FLINT_REPO="https://github.com/flint-editor/flint.git"
+FLINT_BIN="/usr/local/bin/flint"
 
 echo ""
-echo -e "${BOLD}${WHITE}  ┌─────────────────────────────┐${NC}"
-echo -e "${BOLD}${WHITE}  │                             │${NC}"
-echo -e "${BOLD}${WHITE}  │   🪨  Flint Installer       │${NC}"
-echo -e "${BOLD}${WHITE}  │   Local Knowledge Base      │${NC}"
-echo -e "${BOLD}${WHITE}  │                             │${NC}"
-echo -e "${BOLD}${WHITE}  └─────────────────────────────┘${NC}"
+echo -e "${BOLD}⬡ Flint Installer${NC}"
+echo -e "${DIM}Secure, local-first knowledge base${NC}"
 echo ""
 
-# Check dependencies
-echo -e "${GRAY}  Checking dependencies...${NC}"
-
+# Check Node.js
 if ! command -v node &> /dev/null; then
-    echo -e "  ${GREEN}Installing Node.js...${NC}"
-    if command -v apt-get &> /dev/null; then
-        sudo apt-get update -qq && sudo apt-get install -y -qq nodejs npm
+    echo -e "${YELLOW}Node.js not found. Installing...${NC}"
+    if command -v curl &> /dev/null; then
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs
     elif command -v brew &> /dev/null; then
         brew install node
-    elif command -v dnf &> /dev/null; then
-        sudo dnf install -y nodejs npm
-    elif command -v pacman &> /dev/null; then
-        sudo pacman -S --noconfirm nodejs npm
     else
-        echo -e "  Please install Node.js manually: https://nodejs.org"
+        echo -e "${RED}Cannot install Node.js automatically. Please install it manually.${NC}"
         exit 1
     fi
 fi
 
-echo -e "  ${GREEN}✓${NC} Node.js $(node -v)"
-echo -e "  ${GREEN}✓${NC} npm $(npm -v)"
+echo -e "${GREEN}✓${NC} Node.js $(node -v)"
 
-# Setup directory
-echo ""
-echo -e "${GRAY}  Setting up Flint...${NC}"
-
+# Create Flint directory
 mkdir -p "$FLINT_DIR"
+mkdir -p "$FLINT_DIR/vaults"
 
-# If running from the repo, use current directory
+# Copy project files if running from source
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [ -f "$SCRIPT_DIR/package.json" ]; then
-    echo -e "  ${GREEN}✓${NC} Using local source: $SCRIPT_DIR"
-    cd "$SCRIPT_DIR"
+    echo -e "${DIM}Installing from source directory...${NC}"
+    cp -r "$SCRIPT_DIR/." "$FLINT_DIR/src/"
+    cd "$FLINT_DIR/src"
 else
-    # Clone from remote
+    # Clone from repo
     if [ ! -d "$FLINT_DIR/src" ]; then
-        echo -e "  ${GRAY}  Cloning repository...${NC}"
-        git clone "$REPO_URL" "$FLINT_DIR/app" 2>/dev/null || {
-            echo -e "  Could not clone repository."
-            echo -e "  Please run this script from the Flint project directory."
-            exit 1
-        }
-        cd "$FLINT_DIR/app"
-    else
-        cd "$FLINT_DIR"
+        echo -e "${DIM}Cloning Flint repository...${NC}"
+        git clone "$FLINT_REPO" "$FLINT_DIR/src"
     fi
+    cd "$FLINT_DIR/src"
 fi
 
 # Install dependencies
-echo -e "  ${GRAY}  Installing dependencies...${NC}"
-npm install --silent 2>/dev/null
+echo -e "${DIM}Installing dependencies...${NC}"
+npm install --silent 2>/dev/null || npm install
 
-# Build
-echo -e "  ${GRAY}  Building Flint...${NC}"
-npm run build 2>/dev/null
+# Build the project
+echo -e "${DIM}Building Flint...${NC}"
+npm run build
 
-# Copy dist to data directory
-mkdir -p "$FLINT_DIR/dist"
-cp -r dist/* "$FLINT_DIR/dist/" 2>/dev/null || true
-
-echo -e "  ${GREEN}✓${NC} Build complete"
+# Install Electron for desktop mode
+echo -e "${DIM}Setting up desktop mode...${NC}"
+if [ ! -d "$FLINT_DIR/node_modules/electron" ]; then
+    cd "$FLINT_DIR"
+    npm init -y --silent 2>/dev/null || true
+    npm install electron --save-dev --silent 2>/dev/null || npm install electron --save-dev
+fi
 
 # Create launcher script
-mkdir -p "$FLINT_DIR/bin"
-cat > "$FLINT_DIR/bin/flint" << 'LAUNCHER'
+cat > "$FLINT_DIR/flint-desktop.sh" << 'LAUNCHER'
 #!/usr/bin/env bash
-# Flint Launcher
 FLINT_DIR="$HOME/.flint"
-PORT="${FLINT_PORT:-4777}"
+cd "$FLINT_DIR"
+npx electron "$FLINT_DIR/src/electron/main.js" "$@"
+LAUNCHER
+chmod +x "$FLINT_DIR/flint-desktop.sh"
 
-# Kill any existing Flint server
-pkill -f "flint-server" 2>/dev/null || true
+# Create CLI command (opens in browser as fallback)
+cat > "$FLINT_DIR/flint-server.sh" << 'SERVER'
+#!/usr/bin/env bash
+FLINT_DIR="$HOME/.flint"
+PORT=4777
+cd "$FLINT_DIR/src"
+
+# Kill existing server
+pkill -f "python3 -m http.server $PORT" 2>/dev/null || true
+pkill -f "npx serve.*$PORT" 2>/dev/null || true
 
 # Start server
 echo "Starting Flint on http://localhost:$PORT"
-
-# Try python3 first, then node, then busybox
 if command -v python3 &> /dev/null; then
-    python3 -c "
-import http.server
-import os
-import threading
-import webbrowser
-
-os.chdir('$FLINT_DIR/dist')
-server = http.server.HTTPServer(('127.0.0.1', $PORT), http.server.SimpleHTTPRequestHandler)
-threading.Timer(0.5, lambda: webbrowser.open('http://localhost:$PORT')).start()
-print('Flint is running at http://localhost:$PORT')
-print('Press Ctrl+C to stop')
-server.serve_forever()
-"
+    cd dist && python3 -m http.server $PORT &
 elif command -v npx &> /dev/null; then
-    echo "Opening Flint in your browser..."
-    (sleep 1 && xdg-open "http://localhost:$PORT" 2>/dev/null || open "http://localhost:$PORT" 2>/dev/null) &
-    npx -y serve "$FLINT_DIR/dist" -l $PORT -s
+    npx serve dist -l $PORT &
 else
-    echo "Error: Python3 or Node.js required to run the server"
+    echo "Error: Need python3 or npx to run server"
     exit 1
 fi
-LAUNCHER
-chmod +x "$FLINT_DIR/bin/flint"
 
-# Symlink to /usr/local/bin
-if [ -w /usr/local/bin ]; then
-    ln -sf "$FLINT_DIR/bin/flint" /usr/local/bin/flint
-else
-    sudo ln -sf "$FLINT_DIR/bin/flint" /usr/local/bin/flint
+sleep 1
+
+# Open browser
+if command -v xdg-open &> /dev/null; then
+    xdg-open "http://localhost:$PORT"
+elif command -v open &> /dev/null; then
+    open "http://localhost:$PORT"
 fi
-echo -e "  ${GREEN}✓${NC} Command installed: ${DIM}flint${NC}"
 
-# Create .desktop file
-mkdir -p "$HOME/.local/share/applications"
-cat > "$HOME/.local/share/applications/flint.desktop" << DESKTOP
+echo "Flint is running at http://localhost:$PORT"
+echo "Press Ctrl+C to stop"
+wait
+SERVER
+chmod +x "$FLINT_DIR/flint-server.sh"
+
+# Create main flint command
+sudo tee "$FLINT_BIN" > /dev/null << 'CMD'
+#!/usr/bin/env bash
+FLINT_DIR="$HOME/.flint"
+# Try desktop mode first (Electron)
+if [ -d "$FLINT_DIR/node_modules/electron" ]; then
+    "$FLINT_DIR/flint-desktop.sh" "$@"
+else
+    "$FLINT_DIR/flint-server.sh" "$@"
+fi
+CMD
+sudo chmod +x "$FLINT_BIN"
+
+# Create desktop entry (shows in app menu)
+DESKTOP_FILE="$HOME/.local/share/applications/flint.desktop"
+mkdir -p "$(dirname "$DESKTOP_FILE")"
+
+# Try to find or download an icon
+ICON_PATH="$FLINT_DIR/flint-logo.png"
+if [ -f "$FLINT_DIR/src/public/flint-logo.png" ]; then
+    cp "$FLINT_DIR/src/public/flint-logo.png" "$ICON_PATH"
+fi
+
+cat > "$DESKTOP_FILE" << DESKTOP
 [Desktop Entry]
 Name=Flint
-Comment=Local Knowledge Base
-Exec=$FLINT_DIR/bin/flint
-Icon=$FLINT_DIR/dist/flint-logo.png
-Terminal=false
+Comment=Secure, local-first knowledge base
+Exec=$FLINT_DIR/flint-desktop.sh
+Icon=$ICON_PATH
 Type=Application
 Categories=Office;Utility;TextEditor;
+Keywords=notes;markdown;knowledge;
 StartupNotify=true
 DESKTOP
-chmod +x "$HOME/.local/share/applications/flint.desktop"
 
-# Copy logo for icon
-cp -f "$SCRIPT_DIR/public/flint-logo.png" "$FLINT_DIR/dist/flint-logo.png" 2>/dev/null || true
-cp -f "$FLINT_DIR/dist/flint-logo.png" "$FLINT_DIR/flint-logo.png" 2>/dev/null || true
-
-# Update desktop database
-if command -v update-desktop-database &> /dev/null; then
-    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
-fi
-
-echo -e "  ${GREEN}✓${NC} App menu entry created"
-
-# Add to PATH if needed
-if [[ ":$PATH:" != *":$FLINT_DIR/bin:"* ]]; then
-    SHELL_RC="$HOME/.bashrc"
-    if [ -f "$HOME/.zshrc" ] && [ "$SHELL" = *"zsh"* ]; then
-        SHELL_RC="$HOME/.zshrc"
-    fi
-    echo "" >> "$SHELL_RC"
-    echo "# Flint" >> "$SHELL_RC"
-    echo "export PATH=\"\$PATH:$FLINT_DIR/bin\"" >> "$SHELL_RC"
-    echo -e "  ${GREEN}✓${NC} Added to PATH in $(basename $SHELL_RC)"
-fi
+update-desktop-database ~/.local/share/applications/ 2>/dev/null || true
 
 echo ""
-echo -e "${BOLD}${GREEN}  ✅ Flint installed successfully!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  ✓ Flint installed successfully!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${WHITE}Usage:${NC}"
-echo -e "    ${DIM}flint${NC}              Start Flint"
-echo -e "    ${DIM}bash update.sh${NC}     Update Flint"
-echo -e "    ${DIM}bash uninstall.sh${NC}  Remove Flint"
+echo -e "  Open from app menu:  ${BOLD}Flint${NC}"
+echo -e "  Or run in terminal:  ${BOLD}flint${NC}"
+echo -e "  Data stored at:      ${DIM}$FLINT_DIR${NC}"
 echo ""
-echo -e "  ${DIM}Or search 'Flint' in your application menu.${NC}"
+echo -e "  Update:  ${BOLD}bash $FLINT_DIR/src/update.sh${NC}"
+echo -e "  Remove:  ${BOLD}bash $FLINT_DIR/src/uninstall.sh${NC}"
 echo ""
