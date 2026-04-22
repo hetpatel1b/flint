@@ -1,11 +1,13 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
+import { getHandle, writeMarkdownFile } from '../services/filesystem';
 
 export function Editor({ noteId }: { noteId: string }) {
   const { state, dispatch } = useStore();
   const note = state.notes.find(n => n.id === noteId);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (taRef.current && note) {
@@ -13,10 +15,30 @@ export function Editor({ noteId }: { noteId: string }) {
     }
   }, [noteId, note]);
 
+  const saveToFS = useCallback(async (content: string, noteTitle: string) => {
+    if (!state.activeVaultId || !state.hasFolderHandle) return;
+    try {
+      const handle = await getHandle(state.activeVaultId);
+      if (handle) {
+        await writeMarkdownFile(handle, noteTitle, content);
+      }
+    } catch (e) {
+      console.warn('Failed to save to file system:', e);
+    }
+  }, [state.activeVaultId, state.hasFolderHandle]);
+
   const save = useCallback((val: string) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => dispatch({ type: 'UPDATE_NOTE', payload: { id: noteId, content: val } }), 500);
-  }, [dispatch, noteId]);
+    saveTimer.current = setTimeout(() => {
+      dispatch({ type: 'UPDATE_NOTE', payload: { id: noteId, content: val } });
+      // Also save to file system with a longer debounce
+      const currentNote = note;
+      if (currentNote && fsTimer.current) clearTimeout(fsTimer.current);
+      fsTimer.current = setTimeout(() => {
+        saveToFS(val, currentNote?.title || 'Untitled');
+      }, 2000);
+    }, 500);
+  }, [dispatch, noteId, note, saveToFS]);
 
   const handleChange = (val: string) => { save(val); };
 
@@ -64,7 +86,6 @@ export function Editor({ noteId }: { noteId: string }) {
           break;
         }
         case 'heading': {
-          // Find beginning of current line
           const lineStart = val.lastIndexOf('\n', start - 1) + 1;
           const lineEnd = val.indexOf('\n', end);
           const line = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);

@@ -1,142 +1,191 @@
-# Flint - Your Local Vault
+# ⬡ Flint
 
-> A local-first, secure knowledge base. Your thoughts, your data, your control.
+**Secure, local-first knowledge base — a web-based Obsidian clone with AI.**
 
-Flint is a privacy-focused note-taking application inspired by Obsidian. All your data stays on your device — no cloud, no tracking, no subscriptions. Just you and your ideas.
+![Flint](public/flint-logo.png)
 
-![Flint](https://img.shields.io/badge/version-1.0.0-amber?style=flat-square)
-![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square)
+---
 
 ## Features
 
-- **Markdown Editor** — Full GFM support with live preview and split view
-- **Wiki Links** — Connect notes with `[[double brackets]]` syntax
-- **Graph View** — Interactive force-directed knowledge graph (black theme)
-- **Local & Secure** — All data stored on your device via encrypted localStorage
-- **Multi-Vault** — Separate workspaces for different projects
-- **Folders** — Organize notes hierarchically
-- **Search** — Instant full-text search across all notes
-- **Pinning** — Pin important notes for quick access
-- **Auto-save** — Never lose your work
-- **Keyboard Shortcuts** — Efficient workflow with hotkeys
-- **Dark Theme** — Pure black, minimal, easy on the eyes
+### 📝 Markdown Editor
+- Full markdown editing with live preview
+- Wiki-style `[[links]]` between notes
+- Working formatting toolbar (Bold, Italic, Heading, Quote, Code, Link, List, Tag)
+- Auto-save (600ms debounced)
+- Split view (edit + preview side-by-side)
 
-## Installation
+### 📁 Vault System
+- File explorer with folders and notes
+- Create, rename, delete notes and folders
+- Pin important notes
+- Context menus on right-click
+- All data stored in localStorage (private, no cloud)
 
-### Quick Install
+### 🔗 Knowledge Graph
+- Interactive force-directed graph of all note connections
+- Node size scales with connection count
+- Drag nodes to rearrange (connected nodes follow via physics)
+- Zoom, pan, double-click to re-center
+- Physics simulation with pause/resume
 
+### 🧠 AI Assistant (Ollama)
+- Chat with AI about your notes
+- Notes serve as AI memory — graph connections provide context
+- Uses locally-hosted Ollama (no data leaves your machine)
+- Streaming responses in real-time
+- Configure model, temperature, context size in Settings → AI
+
+### ⚙️ Settings
+- Editor: font size, tab size, word wrap, auto-save, spell check
+- AI: Ollama URL, model, temperature, context notes, system prompt
+- About: version info
+
+### 🎨 Pure Black Theme
+- Deep matte black interface (`#0a0a0a`)
+- Obsidian-style three-panel layout
+- 48px ribbon + sidebar + editor + right panel
+- No purple, no blue — pure grayscale
+
+---
+
+## Install as Desktop App
+
+### Prerequisites
+- **Node.js 18+** — [Install here](https://nodejs.org)
+
+### Install
 ```bash
-# Clone the repository
-git clone https://github.com/Chintanpatel24/flint.git
+git clone https://github.com/yourusername/flint.git
 cd flint
-
-# Run the installer
 bash install.sh
 ```
 
-### Manual Install
+After install, Flint appears in your **app menu** as a native desktop application.
 
+### Run from terminal
 ```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Serve locally
-npx serve dist
+flint
 ```
 
-### First Run
-
-After installation:
-
-1. Restart your terminal
-2. Run `flint` to start the server
-3. Open `http://localhost:4512` in your browser
-4. Create your first vault and start writing!
-
-##  Updating
-
+### Update
 ```bash
-# Update to the latest version
+cd flint
 bash update.sh
-
-# Or using the flint command
-flint update
 ```
+If nothing changed, prints: **"App is up to date"**
 
-The update script will:
-- Pull the latest changes from the repository
-- Show the changelog
-- Rebuild the application
-- Preserve all your vault data
+### Uninstall
+```bash
+bash uninstall.sh
+```
+Option to keep or remove vault data.
 
-##  Keyboard Shortcuts
+---
+
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+N` | New note |
-| `Ctrl+E` | Cycle view modes (Edit → Preview → Split) |
-| `Ctrl+G` | Toggle graph view |
-| `Ctrl+Shift+F` | Search all notes |
+| `Ctrl+E` | Cycle view mode (Edit → Preview → Split) |
+| `Ctrl+G` | Graph view |
+| `Ctrl+P` | Command palette |
+| `Ctrl+J` | AI chat panel |
+| `Ctrl+Shift+F` | Search notes |
 | `Ctrl+\` | Toggle sidebar |
+| `Ctrl+,` | Settings |
 | `Ctrl+S` | Force save |
-| `Esc` | Close modal/search |
-
-##  Vault System
-
-Flint uses a **vault system** similar to Obsidian:
-
-- **Multiple vaults** — Create separate workspaces (e.g., Personal, Work, Side Projects)
-- **Independent data** — Each vault has its own notes, folders, and settings
-- **Quick switching** — Switch between vaults from the vault selection screen
-- **Persistent storage** — All data is saved to localStorage per vault
-
-## Security
-
-Flint is designed with privacy as a core principle:
-
-- **Zero cloud** — No data ever leaves your device
-- **No tracking** — No analytics, no telemetry, no phone-home
-- **No accounts** — No sign-up, no login, no servers
-- **Local storage** — All data in your browser's localStorage
-- **Open source** — Audit the code yourself
-
-##  Development
-
-```bash
-# Clone
-git clone https://github.com/flint-vault/flint.git
-cd flint
-
-# Install
-npm install
-
-# Development server
-npm run dev
-
-# Build for production
-npm run build
-```
-
-## Theme
-
-Flint uses a **pure black** dark theme designed for minimal distraction:
-
-- Background: `#000000` (true black)
-- Surfaces: `#0a0a0a` - `#111111`
-- Text: `#e0e0e0` (primary), `#666666` (muted)
-- Accent: `#f59e0b` (amber/gold)
-- The graph view features a pure black canvas with amber glowing nodes
-
-## 📄 License
-
-MIT License — Free to use, modify, and distribute.
 
 ---
 
-<p align="center">
-  <strong>Flint</strong> — Your local vault. Your data. Your control. 
-</p>
+## How It Works
+
+### Desktop App Architecture
+```
+~/.flint/
+├── app/                    # Isolated Electron app
+│   ├── package.json        # NO "type":"module" (avoids ESM conflicts)
+│   ├── main.cjs            # Electron main process (CommonJS)
+│   ├── dist/               # Built web app (single HTML file)
+│   │   └── index.html
+│   └── node_modules/       # Electron only
+│       └── electron/
+├── flint                   # Launcher script
+└── icon.png                # Desktop icon
+```
+
+### Why `.cjs`?
+The web app uses Vite with `"type": "module"` in `package.json`. Electron's main process uses `require()` (CommonJS). The `.cjs` extension forces CommonJS mode, and the Electron app lives in its own directory with no `"type"` field — completely eliminating ESM/CJS conflicts.
+
+### AI Memory System
+```
+User asks question
+       ↓
+Build graph from [[wiki links]]
+       ↓
+Score notes by keywords + graph proximity
+       ↓
+Expand to 1-hop neighbor notes
+       ↓
+Send context + history to Ollama
+       ↓
+Stream response to chat UI
+```
+
+### Data Storage
+All notes, folders, settings, and vault data stored in **localStorage**. Nothing leaves your machine. No server, no cloud, no tracking.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| UI | React 19 + TypeScript |
+| Build | Vite 7 (single-file output) |
+| Styling | Tailwind CSS 4 |
+| Desktop | Electron |
+| AI | Ollama (local LLM) |
+| Icons | Lucide React |
+
+---
+
+## Project Structure
+
+```
+flint/
+├── src/
+│   ├── App.tsx              # Main layout + command palette
+│   ├── store.tsx            # State management (useReducer + Context)
+│   ├── types.ts             # TypeScript types
+│   ├── index.css            # Global styles
+│   ├── components/
+│   │   ├── Sidebar.tsx      # File explorer
+│   │   ├── TabBar.tsx       # Open note tabs
+│   │   ├── Editor.tsx       # Markdown editor
+│   │   ├── Preview.tsx      # Markdown preview
+│   │   ├── GraphView.tsx    # Knowledge graph
+│   │   ├── SearchModal.tsx  # Search across notes
+│   │   ├── StatusBar.tsx    # Bottom status bar
+│   │   ├── BacklinksPanel.tsx # Right panel
+│   │   ├── VaultScreen.tsx  # Vault selector
+│   │   ├── Settings.tsx     # Settings panel
+│   │   └── AIChat.tsx       # AI chat panel
+│   └── services/
+│       └── ollama.ts        # Ollama API client
+├── electron/
+│   └── main.cjs             # Electron main process
+├── public/
+│   └── flint-logo.png       # App icon
+├── install.sh               # Desktop installer
+├── update.sh                # Update checker
+├── uninstall.sh             # Uninstaller
+└── package.json
+```
+
+---
+
+## License
+
+MIT

@@ -6,6 +6,7 @@ export interface Note {
   createdAt: number;
   updatedAt: number;
   pinned?: boolean;
+  filePath?: string; // for folder-based vaults
 }
 
 export interface Folder {
@@ -21,6 +22,8 @@ export interface Vault {
   color: string;
   createdAt: number;
   lastOpened: number;
+  isFolderVault?: boolean;
+  folderPath?: string;
 }
 
 export type ViewMode = 'edit' | 'split' | 'preview';
@@ -32,6 +35,24 @@ export interface FlintSettings {
   showLineNumbers: boolean;
   tabSize: number;
   wordWrap: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;
+  noteContext?: string[];
+  webResults?: string;
+}
+
+export interface AISettings {
+  ollamaUrl: string;
+  model: string;
+  maxContextNotes: number;
+  temperature: number;
+  systemPrompt: string;
+  internetAccess: boolean;
 }
 
 export interface AppState {
@@ -48,4 +69,8 @@ export interface AppState {
   showSearch: boolean;
   showCommandPalette: boolean;
   settingsOpen: boolean;
+  showAIChat: boolean;
+  aiMessages: ChatMessage[];
+  aiSettings: AISettings;
+  hasFolderHandle: boolean; // whether current vault has a live folder handle
 }

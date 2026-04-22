@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import type { Note, Folder, Vault, AppState } from './types';
+import type { Note, Folder, Vault, AppState, ChatMessage, AISettings } from './types';
 
 const STORAGE_KEY = 'flint-data';
 
@@ -14,7 +14,11 @@ function loadState(): AppState | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && parsed.vaults) return parsed;
+    if (parsed && parsed.vaults) {
+      // hasFolderHandle is runtime state — always reset on load
+      parsed.hasFolderHandle = false;
+      return parsed;
+    }
   } catch { /* ignore */ }
   return null;
 }
@@ -251,6 +255,17 @@ function getInitialState(): AppState {
     openTabs: ['n1'], activeNoteId: 'n1',
     viewMode: 'edit', sidebarOpen: true, rightPanelOpen: false,
     showGraphView: false, showSearch: false, showCommandPalette: false, settingsOpen: false,
+    showAIChat: false,
+    aiMessages: [],
+    aiSettings: {
+      ollamaUrl: 'http://localhost:11434',
+      model: '',
+      maxContextNotes: 8,
+      temperature: 0.7,
+      internetAccess: true,
+      systemPrompt: 'You are Flint AI, an intelligent assistant embedded in the Flint note-taking app. You have access to the user\'s notes as your memory. Use this knowledge to provide helpful, contextual answers. When referencing notes, mention them by name. Think carefully based on the connected notes.',
+    },
+    hasFolderHandle: false,
   };
 }
 
@@ -277,7 +292,14 @@ type Action =
   | { type: 'TOGGLE_GRAPH_VIEW' }
   | { type: 'TOGGLE_SEARCH' }
   | { type: 'TOGGLE_COMMAND_PALETTE' }
-  | { type: 'TOGGLE_SETTINGS' };
+  | { type: 'TOGGLE_SETTINGS' }
+  | { type: 'TOGGLE_AI_CHAT' }
+  | { type: 'ADD_AI_MESSAGE'; payload: ChatMessage }
+  | { type: 'CLEAR_AI_MESSAGES' }
+  | { type: 'UPDATE_AI_SETTINGS'; payload: Partial<AISettings> }
+  | { type: 'IMPORT_NOTES'; payload: { notes: Note[]; folders: Folder[] } }
+  | { type: 'SET_FOLDER_HANDLE'; payload: boolean }
+  | { type: 'CREATE_FOLDER_VAULT'; payload: { id: string; name: string; color: string; folderPath: string } };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -333,6 +355,16 @@ function reducer(state: AppState, action: Action): AppState {
     case 'TOGGLE_SEARCH': return { ...state, showSearch: !state.showSearch };
     case 'TOGGLE_COMMAND_PALETTE': return { ...state, showCommandPalette: !state.showCommandPalette };
     case 'TOGGLE_SETTINGS': return { ...state, settingsOpen: !state.settingsOpen };
+    case 'TOGGLE_AI_CHAT': return { ...state, showAIChat: !state.showAIChat };
+    case 'ADD_AI_MESSAGE': return { ...state, aiMessages: [...state.aiMessages, action.payload] };
+    case 'CLEAR_AI_MESSAGES': return { ...state, aiMessages: [] };
+    case 'UPDATE_AI_SETTINGS': return { ...state, aiSettings: { ...state.aiSettings, ...action.payload } };
+    case 'IMPORT_NOTES': return { ...state, notes: action.payload.notes, folders: action.payload.folders, openTabs: action.payload.notes.length > 0 ? [action.payload.notes[0].id] : [], activeNoteId: action.payload.notes.length > 0 ? action.payload.notes[0].id : null };
+    case 'SET_FOLDER_HANDLE': return { ...state, hasFolderHandle: action.payload };
+    case 'CREATE_FOLDER_VAULT': {
+      const vault: Vault = { id: action.payload.id, name: action.payload.name, color: action.payload.color, createdAt: Date.now(), lastOpened: Date.now(), isFolderVault: true, folderPath: action.payload.folderPath };
+      return { ...state, vaults: [...state.vaults, vault] };
+    }
     default: return state;
   }
 }
@@ -345,6 +377,7 @@ interface StoreContextType {
   getNoteByTitle: (title: string) => Note | undefined;
   getBacklinks: (noteId: string) => Note[];
   getOutgoingLinks: (noteId: string) => Note[];
+  importNotes: (notes: Note[], folders: Folder[]) => void;
 }
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -392,8 +425,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return state.notes.filter(n => titles.has(n.title));
   }, [state.notes]);
 
+  const importNotes = useCallback((notes: Note[], folders: Folder[]) => {
+    dispatch({ type: 'IMPORT_NOTES', payload: { notes, folders } });
+  }, []);
+
   return (
-    <StoreContext.Provider value={{ state, dispatch, createNote, createFolder, getNoteByTitle, getBacklinks, getOutgoingLinks }}>
+    <StoreContext.Provider value={{ state, dispatch, createNote, createFolder, getNoteByTitle, getBacklinks, getOutgoingLinks, importNotes }}>
       {children}
     </StoreContext.Provider>
   );

@@ -1,11 +1,39 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { Plus, Trash2, Lock } from 'lucide-react';
+import { Plus, Trash2, Lock, FolderOpen, Folder, AlertCircle } from 'lucide-react';
+import {
+  isFileSystemSupported,
+  readAllMarkdownFiles,
+  storeHandle,
+  requestPermission,
+  getHandle,
+} from '../services/filesystem';
+import type { Note, Folder as FolderType } from '../types';
+
+function StoneLogo({ size = 60 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 100 120" width={size} height={size * 1.2} fill="none">
+      <ellipse cx="50" cy="65" rx="35" ry="45" fill="#2a2a2a" />
+      <ellipse cx="50" cy="63" rx="32" ry="42" fill="#1a1a1a" />
+      <ellipse cx="40" cy="40" rx="14" ry="8" fill="#2a2a2a" opacity="0.7" transform="rotate(-15 40 40)" />
+      <path d="M35 45 L45 65 L40 85 L50 95" stroke="#333" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M45 65 L60 72 L68 85" stroke="#333" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <circle cx="65" cy="50" r="2.5" fill="#e8a030" />
+      <circle cx="65" cy="50" r="4" fill="#e8a030" opacity="0.3" />
+      <line x1="65" y1="43" x2="65" y2="38" stroke="#e8a030" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="70" y1="47" x2="74" y2="44" stroke="#e8a030" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// showDirectoryPicker is declared in src/types/fs.d.ts
 
 export function VaultScreen() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, importNotes } = useStore();
   const [name, setName] = useState('');
   const [showNew, setShowNew] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const colors = ['#888', '#777', '#999', '#aaa', '#666', '#bbb', '#555', '#999'];
 
@@ -18,20 +46,177 @@ export function VaultScreen() {
     setShowNew(false);
   };
 
+  const openFolderAsVault = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      if (!isFileSystemSupported()) {
+        setError('Your browser does not support opening folders. Please use Chrome, Edge, or Opera.');
+        setLoading(false);
+        return;
+      }
+
+      // Show folder picker
+      const dirHandle = await window.showDirectoryPicker!();
+      const vaultName = dirHandle.name;
+
+      // Check permission
+      const permitted = await requestPermission(dirHandle);
+      if (!permitted) {
+        setError('Permission denied. Please allow access to the folder.');
+        setLoading(false);
+        return;
+      }
+
+      // Read all markdown files recursively
+      const files = await readAllMarkdownFiles(dirHandle);
+
+      // Convert to notes
+      const folderMap = new Map<string, FolderType>();
+      const notes: Note[] = files.map((f, i) => {
+        // Create folder from directory path
+        const pathParts = f.path.split('/');
+        let folderId: string | null = null;
+        if (pathParts.length > 1) {
+          // Create parent folders
+          let currentPath = '';
+          for (let j = 0; j < pathParts.length - 1; j++) {
+            const folderName = pathParts[j];
+            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+            if (!folderMap.has(currentPath)) {
+              const fid = 'fdir_' + currentPath.replace(/[^a-zA-Z0-9]/g, '_');
+              folderMap.set(currentPath, {
+                id: fid,
+                name: folderName,
+                parentId: null,
+                collapsed: false,
+              });
+            }
+            const parentFolder = folderMap.get(currentPath);
+            if (parentFolder) folderId = parentFolder.id;
+          }
+        }
+
+        return {
+          id: 'nimport_' + i + '_' + Date.now(),
+          title: f.name,
+          content: f.content,
+          folderId,
+          pinned: false,
+          createdAt: Date.now() - (files.length - i) * 1000,
+          updatedAt: Date.now(),
+          filePath: f.path,
+        };
+      });
+
+      const folders = Array.from(folderMap.values());
+
+      // Create vault
+      const vaultId = 'vfolder_' + Date.now();
+      dispatch({
+        type: 'CREATE_FOLDER_VAULT',
+        payload: { id: vaultId, name: vaultName, color: '#888', folderPath: vaultName },
+      });
+
+      // Store the directory handle in IndexedDB
+      await storeHandle(vaultId, dirHandle);
+
+      // Open vault
+      dispatch({ type: 'OPEN_VAULT', payload: vaultId });
+      dispatch({ type: 'SET_FOLDER_HANDLE', payload: true });
+
+      // Import the notes
+      importNotes(notes, folders);
+
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // User cancelled
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to open folder');
+      }
+    }
+    setLoading(false);
+  };
+
+  const reopenFolderVault = async (vaultId: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      const handle = await getHandle(vaultId);
+      if (!handle) {
+        setError('Folder access lost. Please open the folder again.');
+        setLoading(false);
+        return;
+      }
+      const permitted = await requestPermission(handle);
+      if (!permitted) {
+        setError('Permission denied. Please allow access to the folder.');
+        setLoading(false);
+        return;
+      }
+      const files = await readAllMarkdownFiles(handle);
+
+      const folderMap = new Map<string, FolderType>();
+      const notes: Note[] = files.map((f, i) => {
+        const pathParts = f.path.split('/');
+        let folderId: string | null = null;
+        if (pathParts.length > 1) {
+          let currentPath = '';
+          for (let j = 0; j < pathParts.length - 1; j++) {
+            const folderName = pathParts[j];
+            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+            if (!folderMap.has(currentPath)) {
+              const fid = 'fdir_' + currentPath.replace(/[^a-zA-Z0-9]/g, '_');
+              folderMap.set(currentPath, { id: fid, name: folderName, parentId: null, collapsed: false });
+            }
+            const parentFolder = folderMap.get(currentPath);
+            if (parentFolder) folderId = parentFolder.id;
+          }
+        }
+        return {
+          id: 'nimport_' + i + '_' + Date.now(),
+          title: f.name,
+          content: f.content,
+          folderId,
+          pinned: false,
+          createdAt: Date.now() - (files.length - i) * 1000,
+          updatedAt: Date.now(),
+          filePath: f.path,
+        };
+      });
+
+      const folders = Array.from(folderMap.values());
+      dispatch({ type: 'OPEN_VAULT', payload: vaultId });
+      dispatch({ type: 'SET_FOLDER_HANDLE', payload: true });
+      importNotes(notes, folders);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reopen folder');
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="h-screen flex items-center justify-center" style={{ background: '#050505' }}>
       <div className="animate-fade-in" style={{ width: 480, maxWidth: '95vw' }}>
+        {/* Logo */}
         <div className="text-center" style={{ marginBottom: 40 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 14, background: '#111', border: '1px solid #222', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <img src="/flint-logo.png" alt="Flint" style={{ width: 34, height: 34, borderRadius: 6 }} />
+          <div style={{ width: 80, height: 96, margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <StoneLogo size={60} />
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e0e0e0', letterSpacing: '-0.02em' }}>Flint</h1>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#e0e0e0', letterSpacing: '-0.03em' }}>Flint</h1>
           <p style={{ fontSize: 13, color: '#555', marginTop: 4 }}>Local knowledge base</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 10, color: '#444', marginTop: 8 }}>
             <Lock size={9} /> Offline & Secure
           </div>
         </div>
 
+        {error && (
+          <div className="flex items-center gap-2" style={{ padding: '10px 14px', background: '#1a0a0a', border: '1px solid #331111', borderRadius: 8, marginBottom: 16, fontSize: 12, color: '#cc6666' }}>
+            <AlertCircle size={14} /> {error}
+          </div>
+        )}
+
+        {/* Existing vaults */}
         {state.vaults.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: '#444', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, padding: '0 4px' }}>
@@ -40,17 +225,27 @@ export function VaultScreen() {
             {state.vaults.map(vault => (
               <div key={vault.id}
                 className="flex items-center gap-3 cursor-pointer"
-                style={{ padding: '10px 12px', borderRadius: 8, marginBottom: 2, background: '#0a0a0a', border: '1px solid #1a1a1a', transition: 'all 0.1s' }}
+                style={{ padding: '12px 14px', borderRadius: 8, marginBottom: 2, background: '#0a0a0a', border: '1px solid #1a1a1a', transition: 'all 0.1s' }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.borderColor = '#2a2a2a'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.borderColor = '#1a1a1a'; }}
-                onClick={() => dispatch({ type: 'OPEN_VAULT', payload: vault.id })}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#141414', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222' }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: vault.color }} />
+                onClick={() => {
+                  if (vault.isFolderVault) {
+                    reopenFolderVault(vault.id);
+                  } else {
+                    dispatch({ type: 'OPEN_VAULT', payload: vault.id });
+                  }
+                }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#141414', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #222' }}>
+                  {vault.isFolderVault ? <FolderOpen size={14} style={{ color: '#666' }} /> : <StoneLogo size={16} />}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#ccc' }}>{vault.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#ccc' }}>{vault.name}</div>
                   <div style={{ fontSize: 11, color: '#444', marginTop: 1 }}>
-                    {state.notes.length} notes
+                    {vault.isFolderVault ? (
+                      <span className="flex items-center gap-1"><Folder size={9} /> {vault.folderPath}</span>
+                    ) : (
+                      <span>{state.notes.length} notes · {state.folders.length} folders</span>
+                    )}
                   </div>
                 </div>
                 <button
@@ -65,6 +260,35 @@ export function VaultScreen() {
           </div>
         )}
 
+        {/* Open Folder as Vault — Primary action */}
+        <button
+          onClick={openFolderAsVault}
+          disabled={loading}
+          className="flex items-center justify-center gap-2"
+          style={{
+            width: '100%', padding: '14px 0',
+            background: loading ? '#111' : '#0f0f0f',
+            border: '1px solid #222',
+            borderRadius: 8,
+            color: loading ? '#444' : '#999',
+            fontSize: 14, fontWeight: 600,
+            cursor: loading ? 'wait' : 'pointer',
+            transition: 'all 0.15s',
+            marginBottom: 10,
+          }}
+          onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#161616'; e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#ccc'; } }}
+          onMouseLeave={e => { if (!loading) { e.currentTarget.style.background = '#0f0f0f'; e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#999'; } }}>
+          <FolderOpen size={18} />
+          {loading ? 'Opening...' : 'Open Folder as Vault'}
+        </button>
+
+        {!isFileSystemSupported() && (
+          <p style={{ fontSize: 11, color: '#555', textAlign: 'center', marginBottom: 10 }}>
+            Folder access requires Chrome, Edge, or Opera browser
+          </p>
+        )}
+
+        {/* Create empty vault */}
         {showNew ? (
           <div style={{ background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: 10, padding: 16 }} className="animate-scale-in">
             <div style={{ fontSize: 13, fontWeight: 600, color: '#bbb', marginBottom: 12 }}>Create new vault</div>
@@ -88,20 +312,21 @@ export function VaultScreen() {
         ) : (
           <button onClick={() => setShowNew(true)}
             className="flex items-center justify-center gap-2"
-            style={{ width: '100%', padding: '10px 0', background: '#0a0a0a', border: '1px dashed #222', borderRadius: 8, color: '#666', fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#999'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#666'; }}>
-            <Plus size={15} /> Create new vault
+            style={{ width: '100%', padding: '10px 0', background: '#0a0a0a', border: '1px dashed #222', borderRadius: 8, color: '#555', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.color = '#888'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.color = '#555'; }}>
+            <Plus size={14} /> Create empty vault
           </button>
         )}
 
+        {/* Footer */}
         <div className="text-center" style={{ marginTop: 32 }}>
           <div className="flex items-center justify-center gap-4" style={{ fontSize: 10, color: '#333' }}>
             <span>Encrypted storage</span>
             <span>·</span>
-            <span>Zero telemetry</span>
+            <span>Zero cloud</span>
             <span>·</span>
-            <span>100% offline</span>
+            <span>Your data</span>
           </div>
         </div>
       </div>

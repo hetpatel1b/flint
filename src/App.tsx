@@ -10,12 +10,29 @@ import { StatusBar } from './components/StatusBar';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { VaultScreen } from './components/VaultScreen';
 import { SettingsPanel } from './components/Settings';
+import { AIChat } from './components/AIChat';
 import {
   PanelLeftOpen, PenLine, Eye, Columns2,
   PanelRightOpen, PanelRightClose, Plus, Waypoints, Search,
   Bold, Italic, Code, List, Link2, Heading2, Quote,
-  Command, FolderPlus, Settings, Hash, Brackets,
+  Command, FolderPlus, Settings, Hash, Brackets, Brain,
 } from 'lucide-react';
+
+function StoneLogo({ size = 20 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 100 120" width={size} height={size * 1.2} fill="none">
+      <ellipse cx="50" cy="65" rx="35" ry="45" fill="#2a2a2a" />
+      <ellipse cx="50" cy="63" rx="32" ry="42" fill="#1a1a1a" />
+      <ellipse cx="40" cy="40" rx="14" ry="8" fill="#2a2a2a" opacity="0.7" transform="rotate(-15 40 40)" />
+      <path d="M35 45 L45 65 L40 85 L50 95" stroke="#333" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M45 65 L60 72 L68 85" stroke="#333" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <circle cx="65" cy="50" r="2.5" fill="#e8a030" />
+      <circle cx="65" cy="50" r="4" fill="#e8a030" opacity="0.3" />
+      <line x1="65" y1="43" x2="65" y2="38" stroke="#e8a030" strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="70" y1="47" x2="74" y2="44" stroke="#e8a030" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function CommandPalette() {
   const { dispatch, createNote, createFolder } = useStore();
@@ -34,6 +51,7 @@ function CommandPalette() {
     { icon: <PanelLeftOpen size={14} />, label: 'Toggle sidebar', action: () => { dispatch({ type: 'TOGGLE_SIDEBAR' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
     { icon: <PanelRightOpen size={14} />, label: 'Toggle right panel', action: () => { dispatch({ type: 'TOGGLE_RIGHT_PANEL' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
     { icon: <Settings size={14} />, label: 'Open settings', action: () => { dispatch({ type: 'TOGGLE_SETTINGS' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
+    { icon: <Brain size={14} />, label: 'Open Flint AI', action: () => { dispatch({ type: 'TOGGLE_AI_CHAT' }); dispatch({ type: 'TOGGLE_COMMAND_PALETTE' }); } },
   ];
 
   const filtered = query.trim() ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase())) : commands;
@@ -78,7 +96,7 @@ function CommandPalette() {
 
 function AppContent() {
   const { state, dispatch, createNote } = useStore();
-  const { activeNoteId, viewMode, showGraphView, showSearch, showCommandPalette, sidebarOpen, rightPanelOpen, activeVaultId, settingsOpen } = state;
+  const { activeNoteId, viewMode, showGraphView, showSearch, showCommandPalette, sidebarOpen, rightPanelOpen, activeVaultId, settingsOpen, showAIChat } = state;
 
   // Dynamic style tag for settings
   useEffect(() => {
@@ -105,6 +123,7 @@ function AppContent() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === '\\') { e.preventDefault(); dispatch({ type: 'TOGGLE_SIDEBAR' }); }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); dispatch({ type: 'TOGGLE_SETTINGS' }); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'j') { e.preventDefault(); dispatch({ type: 'TOGGLE_AI_CHAT' }); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -126,8 +145,8 @@ function AppContent() {
         <div className="flex flex-col items-center py-2 gap-0.5 shrink-0"
           style={{ width: 48, background: '#060606', borderRight: '1px solid #1a1a1a' }}>
 
-          <button style={{ width: 34, height: 34, borderRadius: 8, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, border: '1px solid #1a1a1a', cursor: 'pointer' }}>
-            <img src="/flint-logo.png" alt="Flint" style={{ width: 20, height: 20, borderRadius: 4 }} />
+          <button style={{ width: 36, height: 36, borderRadius: 8, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8, border: '1px solid #1a1a1a', cursor: 'pointer' }}>
+            <StoneLogo size={18} />
           </button>
 
           <RibbonBtn icon={<PanelLeftOpen size={16} />} active={sidebarOpen} onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })} title="Toggle sidebar (Ctrl+\)" />
@@ -135,6 +154,7 @@ function AppContent() {
           <RibbonBtn icon={<Plus size={16} />} onClick={() => createNote()} title="New note (Ctrl+N)" />
           <RibbonBtn icon={<Waypoints size={16} />} active={showGraphView} onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })} title="Graph view (Ctrl+G)" />
           <RibbonBtn icon={<Command size={16} />} onClick={() => dispatch({ type: 'TOGGLE_COMMAND_PALETTE' })} title="Command palette (Ctrl+P)" />
+          <RibbonBtn icon={<Brain size={16} />} active={showAIChat} onClick={() => dispatch({ type: 'TOGGLE_AI_CHAT' })} title="Flint AI (Ctrl+J)" />
 
           <div className="flex-1" />
 
@@ -153,8 +173,8 @@ function AppContent() {
             return (
               <div className="flex-1 flex items-center justify-center" style={{ background: '#0a0a0a' }}>
                 <div className="text-center animate-fade-in">
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#0f0f0f', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '1px solid #1a1a1a' }}>
-                    <img src="/flint-logo.png" alt="Flint" style={{ width: 26, height: 26, borderRadius: 5 }} />
+                  <div style={{ width: 56, height: 56, borderRadius: 14, background: '#0f0f0f', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '1px solid #1a1a1a' }}>
+                    <StoneLogo size={28} />
                   </div>
                   <h2 style={{ fontSize: 16, fontWeight: 600, color: '#888', marginBottom: 8 }}>No note selected</h2>
                   <p style={{ color: '#333', fontSize: 13, marginBottom: 20, maxWidth: 260, lineHeight: 1.5, margin: '0 auto 20px' }}>
@@ -249,6 +269,9 @@ function AppContent() {
 
         {/* Right panel */}
         {rightPanelOpen && activeNoteId && <BacklinksPanel noteId={activeNoteId} />}
+
+        {/* AI Chat panel */}
+        {showAIChat && <AIChat />}
       </div>
 
       <StatusBar />
