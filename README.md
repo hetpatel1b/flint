@@ -2,8 +2,6 @@
 
 A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI — all running locally on your machine.
 
-![Flint](public/flint-logo.png)
-
 ---
 
 ## ✨ Features
