@@ -1,4 +1,4 @@
-# 🔥 Flint — Your Local Vault
+# Flint — Your Local Vault
 
 > A local-first, secure knowledge base. Your thoughts, your data, your control.
 
@@ -8,21 +8,21 @@ Flint is a privacy-focused note-taking application inspired by Obsidian. All you
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=flat-square)
 
-## ✨ Features
+## Features
 
-- **📝 Markdown Editor** — Full GFM support with live preview and split view
-- **🔗 Wiki Links** — Connect notes with `[[double brackets]]` syntax
-- **🌐 Graph View** — Interactive force-directed knowledge graph (black theme)
-- **🔒 Local & Secure** — All data stored on your device via encrypted localStorage
-- **🏪 Multi-Vault** — Separate workspaces for different projects
-- **📁 Folders** — Organize notes hierarchically
-- **🔍 Search** — Instant full-text search across all notes
-- **📌 Pinning** — Pin important notes for quick access
-- **💾 Auto-save** — Never lose your work
-- **⌨️ Keyboard Shortcuts** — Efficient workflow with hotkeys
-- **🌙 Dark Theme** — Pure black, minimal, easy on the eyes
+- **Markdown Editor** — Full GFM support with live preview and split view
+- **Wiki Links** — Connect notes with `[[double brackets]]` syntax
+- **Graph View** — Interactive force-directed knowledge graph (black theme)
+- **Local & Secure** — All data stored on your device via encrypted localStorage
+- **Multi-Vault** — Separate workspaces for different projects
+- **Folders** — Organize notes hierarchically
+- **Search** — Instant full-text search across all notes
+- **Pinning** — Pin important notes for quick access
+- **Auto-save** — Never lose your work
+- **Keyboard Shortcuts** — Efficient workflow with hotkeys
+- **Dark Theme** — Pure black, minimal, easy on the eyes
 
-## 🚀 Installation
+## Installation
 
 ### Quick Install
 
@@ -57,7 +57,7 @@ After installation:
 3. Open `http://localhost:4512` in your browser
 4. Create your first vault and start writing!
 
-## 🔄 Updating
+##  Updating
 
 ```bash
 # Update to the latest version
@@ -73,7 +73,7 @@ The update script will:
 - Rebuild the application
 - Preserve all your vault data
 
-## ⌨️ Keyboard Shortcuts
+##  Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
@@ -85,7 +85,7 @@ The update script will:
 | `Ctrl+S` | Force save |
 | `Esc` | Close modal/search |
 
-## 🏪 Vault System
+##  Vault System
 
 Flint uses a **vault system** similar to Obsidian:
 
@@ -94,19 +94,7 @@ Flint uses a **vault system** similar to Obsidian:
 - **Quick switching** — Switch between vaults from the vault selection screen
 - **Persistent storage** — All data is saved to localStorage per vault
 
-### Vault Data Location
-
-```
-~/.flint/
-├── bin/
-│   └── flint          # Launcher script
-├── config/
-│   └── settings.json  # Global settings
-├── src/               # Application source
-└── vaults/            # Vault data directories
-```
-
-## 🔒 Security
+## Security
 
 Flint is designed with privacy as a core principle:
 
@@ -116,7 +104,7 @@ Flint is designed with privacy as a core principle:
 - **Local storage** — All data in your browser's localStorage
 - **Open source** — Audit the code yourself
 
-## 🛠️ Development
+##  Development
 
 ```bash
 # Clone
@@ -133,7 +121,7 @@ npm run dev
 npm run build
 ```
 
-## 🎨 Theme
+## Theme
 
 Flint uses a **pure black** dark theme designed for minimal distraction:
 
@@ -150,5 +138,5 @@ MIT License — Free to use, modify, and distribute.
 ---
 
 <p align="center">
-  <strong>Flint</strong> — Your local vault. Your data. Your control. 🔥
+  <strong>Flint</strong> — Your local vault. Your data. Your control. 
 </p>
