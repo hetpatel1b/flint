@@ -16,9 +16,10 @@
 
 ---
 
-https://github.com/user-attachments/assets/dbd70229-1ea6-499c-9fdd-476cdb581a79
+https://github.com/user-attachments/assets/8f073bf8-ef44-4ef2-8728-6cf2a7994a3c
 
 ---
+
 ## Features
 
 ### Note-Taking
