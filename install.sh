@@ -166,34 +166,33 @@ echo -e "${BLUE}[6/9]${NC} Creating application icon..."
 ICON_DIR="$FLINT_DIR/icons"
 mkdir -p "$ICON_DIR"
 
-if [ -f "$BUILD_DIR/public/flint-icon.svg" ]; then
-    cp "$BUILD_DIR/public/flint-icon.svg" "$ICON_DIR/flint.svg"
-fi
-
 if [ -f "$BUILD_DIR/public/flint-logo.png" ]; then
+    # Copy the main PNG icon everywhere
     cp "$BUILD_DIR/public/flint-logo.png" "$FLINT_DIR/icon.png"
     cp "$BUILD_DIR/public/flint-logo.png" "$FLINT_APP/icon.png"
     cp "$BUILD_DIR/public/flint-logo.png" "$ICON_DIR/flint.png"
-fi
 
-if command -v convert &> /dev/null; then
-    convert -background none -resize 256x256 "$ICON_DIR/flint.svg" "$ICON_DIR/flint-256.png" 2>/dev/null || true
-    convert -background none -resize 128x128 "$ICON_DIR/flint.svg" "$ICON_DIR/flint-128.png" 2>/dev/null || true
-    convert -background none -resize 64x64 "$ICON_DIR/flint.svg" "$ICON_DIR/flint-64.png" 2>/dev/null || true
-    if [ -f "$ICON_DIR/flint-256.png" ]; then
-        cp "$ICON_DIR/flint-256.png" "$FLINT_DIR/icon.png"
-        cp "$ICON_DIR/flint-256.png" "$FLINT_APP/icon.png"
+    # Create resized versions using ImageMagick if available
+    if command -v convert &> /dev/null; then
+        convert -background none -resize 256x256 "$ICON_DIR/flint.png" "$ICON_DIR/flint-256.png" 2>/dev/null || true
+        convert -background none -resize 128x128 "$ICON_DIR/flint.png" "$ICON_DIR/flint-128.png" 2>/dev/null || true
+        convert -background none -resize 64x64 "$ICON_DIR/flint.png" "$ICON_DIR/flint-64.png" 2>/dev/null || true
+        convert -background none -resize 48x48 "$ICON_DIR/flint.png" "$ICON_DIR/flint-48.png" 2>/dev/null || true
+        if [ -f "$ICON_DIR/flint-256.png" ]; then
+            cp "$ICON_DIR/flint-256.png" "$FLINT_DIR/icon.png"
+            cp "$ICON_DIR/flint-256.png" "$FLINT_APP/icon.png"
+        fi
+        echo -e "      ${GREEN}✓${NC} Icon created at all sizes (ImageMagick)"
+    else
+        # Just use the PNG as-is at all sizes
+        cp "$ICON_DIR/flint.png" "$ICON_DIR/flint-256.png"
+        cp "$ICON_DIR/flint.png" "$ICON_DIR/flint-128.png"
+        cp "$ICON_DIR/flint.png" "$ICON_DIR/flint-64.png"
+        cp "$ICON_DIR/flint.png" "$ICON_DIR/flint-48.png"
+        echo -e "      ${GREEN}✓${NC} Icon created from PNG"
     fi
-    echo -e "      ${GREEN}✓${NC} Icon created (ImageMagick)"
-elif command -v rsvg-convert &> /dev/null; then
-    rsvg-convert -w 256 -h 256 "$ICON_DIR/flint.svg" -o "$ICON_DIR/flint-256.png" 2>/dev/null || true
-    if [ -f "$ICON_DIR/flint-256.png" ]; then
-        cp "$ICON_DIR/flint-256.png" "$FLINT_DIR/icon.png"
-        cp "$ICON_DIR/flint-256.png" "$FLINT_APP/icon.png"
-    fi
-    echo -e "      ${GREEN}✓${NC} Icon created (rsvg-convert)"
 else
-    echo -e "      ${YELLOW}⚠${NC} Using default PNG icon"
+    echo -e "      ${YELLOW}⚠${NC} No flint-logo.png found"
 fi
 
 # ---- Step 7: Set up Electron app ----
