@@ -12,7 +12,7 @@
 
 # Flint 
 
-> - A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI — all running locally on your machine.
+> - A **secure, local-first knowledge base** with AI-powered intelligence. Your notes, your graph, your AI - all running locally on your machine.
 
 ---
 
@@ -56,20 +56,20 @@ git clone --branch test-api --single-branch https://github.com/Chintanpatel24/fl
 ### Graph View
 - Interactive **force-directed graph** visualization
 - Node size scales with connection count
-- Physics simulation — drag nodes, connected notes follow
+- Physics simulation - drag nodes, connected notes follow
 - Zoom, pan, search, depth filter
 - Curved edges between connected notes
 
-### AI Agent (Python + Ollama)
+### AI Agent (Python + Ollama + local models + APIs)
 - **Real Python backend** that connects to Ollama locally
-- **Notes = Memory** — AI reads all your notes and graph connections
-- **Internet access** — AI searches Wikipedia for real-time info
-- **Works with ANY Ollama model** — llama3.2, mistral, codellama, phi3, etc.
+- **Notes = Memory** - AI reads all your notes and graph connections
+- **Internet access** - AI searches Wikipedia for real-time info
+- **Works with ANY Ollama model** - llama3.2, mistral, codellama, phi3, etc.
 - **Streaming responses** in real-time
 - **Browser fallback** when agent is not running
 
-### Local & Secure
-- **No cloud, no tracking** — all data stays on your device
+### Local & Secure 
+- **No cloud, no tracking** - all data stays on your device
 - **localStorage** for persistence
 - **No external API calls** (except Wikipedia when internet access is enabled)
 - **File System Access API** to open any local folder as a vault
