@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/94fa53f9-b3b6-4df8-9038-3f763aec54d4
 
 ##  Installation
 
-### For useres !!
+### For useres (Linux/Mac)
 ```bash
 git clone https://github.com/Chintanpatel24/flint.git
 cd flint
