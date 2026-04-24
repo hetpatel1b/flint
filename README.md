@@ -17,7 +17,7 @@
 ---
 
 https://github.com/user-attachments/assets/94fa53f9-b3b6-4df8-9038-3f763aec54d4
-
+> - The connection lines between the nodes are very thin, so it's not visible in the video. I will fix it very soon.
 ---
 
 ##  Installation
