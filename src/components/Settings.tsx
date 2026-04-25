@@ -656,7 +656,7 @@ export function SettingsPanel() {
               </div>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#999' }}>Flint</div>
-                <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>Version 1.0.0</div>
+                <div style={{ fontSize: 11, color: '#444', marginTop: 4 }}>Version 2.0.2</div>
               </div>
               <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6, maxWidth: 340, margin: '0 auto' }}>
                 A secure, local-first knowledge base<br />with AI-powered memory.<br />
