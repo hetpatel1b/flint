@@ -26,8 +26,6 @@
        
   <summary>Tap to view ⤥ </summary>
        
-https://github.com/user-attachments/assets/94fa53f9-b3b6-4df8-9038-3f763aec54d4
-
 https://github.com/user-attachments/assets/eab43b70-609a-4373-8f2c-8afc854dece9
 
 </details>   
