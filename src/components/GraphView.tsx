@@ -3,6 +3,8 @@ import { useStore } from '../store';
 import { FlintLogo } from './FlintLogo';
 import { X, ZoomIn, ZoomOut, RotateCcw, Search, Maximize2, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface GNode {
   id: string;
   title: string;
@@ -20,240 +22,142 @@ interface GEdge {
 
 type LayoutMode = 'force' | 'ring';
 
+// ─── Constants (matching Obsidian's real palette from the screenshot) ─────────
+
+const OBS_BG        = '#0d0d0d';
+const OBS_BLUE      = '#4a9ef5';          // Obsidian's selection / highlight blue
+const OBS_NODE_BASE = '#c8cdd6';          // the muted white-gray nodes in the image
+const GRID_DOT      = 'rgba(255,255,255,0.032)';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function hexToRgba(hex: string, alpha: number): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) || 0;
+  const g = parseInt(c.substring(2, 4), 16) || 0;
+  const b = parseInt(c.substring(4, 6), 16) || 0;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function getSettingsKey(vaultId: string | null) {
   return `flint-graph-settings-${vaultId || 'default'}`;
 }
-
 function loadSettings(vaultId: string | null) {
-  try {
-    const raw = localStorage.getItem(getSettingsKey(vaultId));
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  try { const r = localStorage.getItem(getSettingsKey(vaultId)); return r ? JSON.parse(r) : null; }
+  catch { return null; }
+}
+function saveSettings(vaultId: string | null, s: Record<string, unknown>) {
+  try { localStorage.setItem(getSettingsKey(vaultId), JSON.stringify(s)); } catch {}
 }
 
-function saveSettings(vaultId: string | null, settings: Record<string, unknown>) {
-  try {
-    localStorage.setItem(getSettingsKey(vaultId), JSON.stringify(settings));
-  } catch {
-    // ignore
-  }
-}
-
-function isDarkTheme(): boolean {
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim();
-  if (!bg) return true;
-  if (bg.startsWith('#')) {
-    const hex = bg.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16) || 0;
-    const g = parseInt(hex.substring(2, 4), 16) || 0;
-    const b = parseInt(hex.substring(4, 6), 16) || 0;
-    return (r + g + b) / 3 < 128;
-  }
-  return true;
-}
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function GraphView() {
   const { state, dispatch } = useStore();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const nodesRef = useRef<GNode[]>([]);
-  const edgesRef = useRef<GEdge[]>([]);
-  const dragRef = useRef<string | null>(null);
-  const wasDragRef = useRef(false);
-  const panRef = useRef({ x: 0, y: 0, dragging: false, sx: 0, sy: 0 });
-  const zoomRef = useRef(1);
-  const animRef = useRef(0);
-  const hoverRef = useRef<string | null>(null);
-  const sizeRef = useRef({ w: 0, h: 0 });
+
+  // Mutable refs shared with the render loop — no re-renders needed
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const nodesRef      = useRef<GNode[]>([]);
+  const edgesRef      = useRef<GEdge[]>([]);
+  const dragRef       = useRef<string | null>(null);
+  const wasDragRef    = useRef(false);
+  const panRef        = useRef({ x: 0, y: 0, dragging: false, sx: 0, sy: 0 });
+  const zoomRef       = useRef(1);
+  const animRef       = useRef(0);
+  const hoverRef      = useRef<string | null>(null);
+  const sizeRef       = useRef({ w: 0, h: 0 });
   const layoutModeRef = useRef<LayoutMode>('force');
+  // Simulation cool-down: 1 = hot, 0 = frozen. Avoids wasting CPU when settled.
+  const alphaRef      = useRef(1);
 
-  const [query, setQuery] = useState('');
-  const [stats, setStats] = useState({ nodes: 0, edges: 0 });
-  const [zoom, setZoom] = useState(1);
+  // UI state
+  const [query,        setQuery]        = useState('');
+  const [stats,        setStats]        = useState({ nodes: 0, edges: 0 });
+  const [zoom,         setZoom]         = useState(1);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('force');
+  const [layoutMode,   setLayoutMode]   = useState<LayoutMode>('force');
 
+  // Appearance settings (persisted per-vault)
   const saved = useMemo(() => loadSettings(state.activeVaultId), [state.activeVaultId]);
-  const [nodeColor, setNodeColor] = useState(saved?.nodeColor || '#7c6f9f');
-  const [activeNodeColor, setActiveNodeColor] = useState(saved?.activeNodeColor || '#a78bfa');
-  const [lineColor, setLineColor] = useState(saved?.lineColor || '#4a4460');
-  const [activeLineColor, setActiveLineColor] = useState(saved?.activeLineColor || '#7c6f9f');
-  const [nodeBaseSize, setNodeBaseSize] = useState<number>(saved?.nodeBaseSize ?? 4);
-  const [connBoost, setConnBoost] = useState<number>(saved?.connBoost ?? 1.2);
-  const [lineWidth, setLineWidth] = useState<number>(saved?.lineWidth ?? 1);
-  const [activeLineWidth, setActiveLineWidth] = useState<number>(saved?.activeLineWidth ?? 2.0);
-  const [lineOpacity, setLineOpacity] = useState<number>(saved?.lineOpacity ?? 0.5);
-  const [lineDash, setLineDash] = useState<'solid' | 'dashed' | 'dotted'>(saved?.lineDash || 'solid');
+  const [nodeColor,     setNodeColor]     = useState<string>(saved?.nodeColor     ?? OBS_NODE_BASE);
+  const [activeColor,   setActiveColor]   = useState<string>(saved?.activeColor   ?? OBS_BLUE);
+  const [lineColor,     setLineColor]     = useState<string>(saved?.lineColor     ?? '#6b7280');
+  const [nodeBaseSize,  setNodeBaseSize]  = useState<number>(saved?.nodeBaseSize  ?? 5);
+  const [connBoost,     setConnBoost]     = useState<number>(saved?.connBoost     ?? 1.5);
+  const [lineWidth,     setLineWidth]     = useState<number>(saved?.lineWidth     ?? 1);
+  const [lineOpacity,   setLineOpacity]   = useState<number>(saved?.lineOpacity   ?? 0.5);
   const [showAllLabels, setShowAllLabels] = useState<boolean>(saved?.showAllLabels ?? false);
-  const [radialSpread, setRadialSpread] = useState<number>(saved?.radialSpread ?? 220);
+  const [repulsion,     setRepulsion]     = useState<number>(saved?.repulsion     ?? 120);
+  const [linkDist,      setLinkDist]      = useState<number>(saved?.linkDist      ?? 85);
 
+  // Mirror settings into a ref so the render loop always reads current values
+  const sRef = useRef({ nodeColor, activeColor, lineColor, nodeBaseSize, connBoost, lineWidth, lineOpacity, showAllLabels, repulsion, linkDist });
   useEffect(() => {
-    saveSettings(state.activeVaultId, {
-      nodeColor, activeNodeColor, lineColor, activeLineColor,
-      nodeBaseSize, connBoost, lineWidth, activeLineWidth,
-      lineOpacity, lineDash, showAllLabels, radialSpread,
-    });
-  }, [nodeColor, activeNodeColor, lineColor, activeLineColor,
-      nodeBaseSize, connBoost, lineWidth, activeLineWidth,
-      lineOpacity, lineDash, showAllLabels, radialSpread, state.activeVaultId]);
+    sRef.current = { nodeColor, activeColor, lineColor, nodeBaseSize, connBoost, lineWidth, lineOpacity, showAllLabels, repulsion, linkDist };
+    saveSettings(state.activeVaultId, sRef.current);
+    alphaRef.current = 1; // reheat so changes are visible
+  }, [nodeColor, activeColor, lineColor, nodeBaseSize, connBoost, lineWidth, lineOpacity, showAllLabels, repulsion, linkDist, state.activeVaultId]);
 
-  const settingsRef = useRef({
-    nodeColor, activeNodeColor, lineColor, activeLineColor,
-    nodeBaseSize, connBoost, lineWidth, activeLineWidth,
-    lineOpacity, lineDash, showAllLabels, radialSpread,
-  });
+  useEffect(() => { layoutModeRef.current = layoutMode; alphaRef.current = 1; }, [layoutMode]);
 
-  useEffect(() => {
-    settingsRef.current = {
-      nodeColor, activeNodeColor, lineColor, activeLineColor,
-      nodeBaseSize, connBoost, lineWidth, activeLineWidth,
-      lineOpacity, lineDash, showAllLabels, radialSpread,
-    };
-  }, [nodeColor, activeNodeColor, lineColor, activeLineColor,
-      nodeBaseSize, connBoost, lineWidth, activeLineWidth,
-      lineOpacity, lineDash, showAllLabels, radialSpread]);
-
-  useEffect(() => {
-    layoutModeRef.current = layoutMode;
-  }, [layoutMode]);
+  // ── Build graph ─────────────────────────────────────────────────────────────
 
   const buildGraph = useCallback(() => {
-    const links: Record<string, Set<string>> = {};
     const titleMap = new Map(state.notes.map(n => [n.title.toLowerCase(), n.id]));
-
-    state.notes.forEach(n => { links[n.id] = new Set(); });
+    const adjMap: Record<string, Set<string>> = {};
+    state.notes.forEach(n => { adjMap[n.id] = new Set(); });
     state.notes.forEach(n => {
-      const matches = n.content.matchAll(/\[\[([^\]|]+?)(?:\|[^\]]+)?\]\]/g);
-      for (const m of matches) {
+      for (const m of n.content.matchAll(/\[\[([^\]|]+?)(?:\|[^\]]+)?\]\]/g)) {
         const tid = titleMap.get(m[1].toLowerCase());
         if (tid && tid !== n.id) {
-          links[n.id].add(tid);
-          if (links[tid]) links[tid].add(n.id);
+          adjMap[n.id].add(tid);
+          if (adjMap[tid]) adjMap[tid].add(n.id);
         }
       }
     });
 
-    const cx = sizeRef.current.w / 2 || 500;
-    const cy = sizeRef.current.h / 2 || 400;
-    const spread = settingsRef.current.radialSpread;
-
-    const sorted = state.notes
-      .map(n => ({ note: n, conns: links[n.id]?.size || 0 }))
-      .sort((a, b) => b.conns - a.conns);
-
+    const { w, h } = sizeRef.current;
+    const cx = w / 2 || 500, cy = h / 2 || 400;
     const existing = new Map(nodesRef.current.map(n => [n.id, { x: n.x, y: n.y }]));
 
-    nodesRef.current = sorted.map(({ note, conns }, index) => {
-      const old = existing.get(note.id);
-
-      // Ring layout positions
-      let ring: number;
-      if (conns >= 5) ring = 0;
-      else if (conns >= 3) ring = 1;
-      else if (conns >= 1) ring = 2;
-      else ring = 3;
-
-      const nodesInRing = sorted.filter(s => {
-        if (ring === 0) return s.conns >= 5;
-        if (ring === 1) return s.conns >= 3 && s.conns < 5;
-        if (ring === 2) return s.conns >= 1 && s.conns < 3;
-        return s.conns === 0;
-      });
-
-      const indexInRing = nodesInRing.findIndex(s => s.note.id === note.id);
-      const countInRing = nodesInRing.length;
-
-      const radius = ring === 0
-        ? spread * 0.3
-        : ring === 1
-        ? spread * 0.65
-        : ring === 2
-        ? spread * 1.0
-        : spread * 1.4;
-
-      const angle = countInRing > 0
-        ? (indexInRing / countInRing) * Math.PI * 2 - Math.PI / 2
-        : 0;
-
-      const targetX = cx + Math.cos(angle) * radius;
-      const targetY = cy + Math.sin(angle) * radius;
-
-      // Force-directed: scatter from center with jitter
-      const forceX = cx + (Math.random() - 0.5) * spread * 1.5;
-      const forceY = cy + (Math.random() - 0.5) * spread * 1.5;
-
+    nodesRef.current = state.notes.map(note => {
+      const conns = adjMap[note.id]?.size || 0;
+      const old   = existing.get(note.id);
+      // Spread new nodes in a small cluster so force-directed can settle naturally
+      const angle = Math.random() * Math.PI * 2;
+      const r     = 40 + Math.random() * 160;
       return {
-        id: note.id,
-        title: note.title,
-        x: old?.x ?? (layoutModeRef.current === 'ring' ? targetX : forceX),
-        y: old?.y ?? (layoutModeRef.current === 'ring' ? targetY : forceY),
-        vx: 0,
-        vy: 0,
-        conns,
+        id: note.id, title: note.title, conns,
+        x: old?.x ?? cx + Math.cos(angle) * r,
+        y: old?.y ?? cy + Math.sin(angle) * r,
+        vx: 0, vy: 0,
       };
     });
 
     const edgeSet = new Set<string>();
     edgesRef.current = [];
     state.notes.forEach(n => {
-      const matches = n.content.matchAll(/\[\[([^\]|]+?)(?:\|[^\]]+)?\]\]/g);
-      for (const m of matches) {
+      for (const m of n.content.matchAll(/\[\[([^\]|]+?)(?:\|[^\]]+)?\]\]/g)) {
         const tid = titleMap.get(m[1].toLowerCase());
         if (tid && tid !== n.id) {
-          const key = [n.id, tid].sort().join('-');
-          if (!edgeSet.has(key)) {
-            edgeSet.add(key);
-            edgesRef.current.push({ from: n.id, to: tid });
-          }
+          const key = [n.id, tid].sort().join('~');
+          if (!edgeSet.has(key)) { edgeSet.add(key); edgesRef.current.push({ from: n.id, to: tid }); }
         }
       }
     });
 
     setStats({ nodes: nodesRef.current.length, edges: edgesRef.current.length });
+    alphaRef.current = 1;
   }, [state.notes]);
 
-  // Snap to ring positions
-  const applyRingLayout = useCallback(() => {
-    const cx = sizeRef.current.w / 2 || 500;
-    const cy = sizeRef.current.h / 2 || 400;
-    const spread = settingsRef.current.radialSpread;
-    const sorted = [...nodesRef.current].sort((a, b) => b.conns - a.conns);
-
-    nodesRef.current.forEach(node => {
-      const sortedIdx = sorted.findIndex(n => n.id === node.id);
-      const conns = node.conns;
-      let ring: number;
-      if (conns >= 5) ring = 0;
-      else if (conns >= 3) ring = 1;
-      else if (conns >= 1) ring = 2;
-      else ring = 3;
-
-      const nodesInRing = sorted.filter(n => {
-        const c = n.conns;
-        if (ring === 0) return c >= 5;
-        if (ring === 1) return c >= 3 && c < 5;
-        if (ring === 2) return c >= 1 && c < 3;
-        return c === 0;
-      });
-
-      const indexInRing = nodesInRing.findIndex(n => n.id === node.id);
-      const countInRing = nodesInRing.length;
-      const radius = ring === 0 ? spread * 0.3 : ring === 1 ? spread * 0.65 : ring === 2 ? spread * 1.0 : spread * 1.4;
-      const angle = countInRing > 0 ? (indexInRing / countInRing) * Math.PI * 2 - Math.PI / 2 : 0;
-
-      node.vx += (cx + Math.cos(angle) * radius - node.x) * 0.04;
-      node.vy += (cy + Math.sin(angle) * radius - node.y) * 0.04;
-    });
-  }, []);
+  // ── Resize ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const resize = () => {
       const rect = canvas.parentElement!.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      canvas.width = rect.width; canvas.height = rect.height;
       sizeRef.current = { w: rect.width, h: rect.height };
     };
     resize();
@@ -263,305 +167,283 @@ export function GraphView() {
 
   useEffect(() => { buildGraph(); }, [buildGraph]);
 
+  // ── Ring layout helper (used as extra forces when mode === 'ring') ──────────
+
+  const ringForces = useCallback(() => {
+    const nodes = nodesRef.current;
+    const { w, h } = sizeRef.current;
+    const cx = w / 2, cy = h / 2;
+    const spread = sRef.current.linkDist * 3.2;
+    const sorted = [...nodes].sort((a, b) => b.conns - a.conns);
+
+    nodes.forEach(node => {
+      const ring = node.conns >= 5 ? 0 : node.conns >= 3 ? 1 : node.conns >= 1 ? 2 : 3;
+      const ring_r = spread * [0.22, 0.52, 0.88, 1.3][ring];
+      const rNodes = sorted.filter(n =>
+        ring === 0 ? n.conns >= 5 :
+        ring === 1 ? n.conns >= 3 && n.conns < 5 :
+        ring === 2 ? n.conns >= 1 && n.conns < 3 :
+        n.conns === 0
+      );
+      const idx   = rNodes.findIndex(n => n.id === node.id);
+      const count = rNodes.length;
+      const angle = count > 0 ? (idx / count) * Math.PI * 2 - Math.PI / 2 : 0;
+      node.vx += (cx + Math.cos(angle) * ring_r - node.x) * 0.07;
+      node.vy += (cy + Math.sin(angle) * ring_r - node.y) * 0.07;
+    });
+  }, []);
+
+  // ── Main animation loop ─────────────────────────────────────────────────────
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
     let running = true;
-    const dark = isDarkTheme();
-
-    // Obsidian dark palette
-    const BG = '#0d0d0d';
-    const GRID_DOT = 'rgba(255,255,255,0.035)';
 
     const getNode = (id: string) => nodesRef.current.find(n => n.id === id);
 
+    // ── Physics (Obsidian's n-body + spring model) ──────────────────────────
     const simulate = () => {
+      const alpha = alphaRef.current;
+      if (alpha < 0.0015) return; // frozen — skip CPU work
+
       const nodes = nodesRef.current;
       const edges = edgesRef.current;
-      const mode = layoutModeRef.current;
+      const s     = sRef.current;
+      const { w, h } = sizeRef.current;
+      const cx = w / 2, cy = h / 2;
 
-      if (mode === 'force') {
-        const cx = sizeRef.current.w / 2;
-        const cy = sizeRef.current.h / 2;
-
-        // Repulsion between all nodes
+      if (layoutModeRef.current === 'force') {
+        // Many-body repulsion — identical to Obsidian's d3-force charge
+        const rep = s.repulsion * 90 * alpha;
         for (let i = 0; i < nodes.length; i++) {
           for (let j = i + 1; j < nodes.length; j++) {
-            const dx = nodes[j].x - nodes[i].x;
-            const dy = nodes[j].y - nodes[i].y;
-            const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-            const force = 2800 / (dist * dist);
-            const fx = (dx / dist) * force;
-            const fy = (dy / dist) * force;
-            nodes[i].vx -= fx;
-            nodes[i].vy -= fy;
-            nodes[j].vx += fx;
-            nodes[j].vy += fy;
+            const dx   = nodes[j].x - nodes[i].x;
+            const dy   = nodes[j].y - nodes[i].y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const f    = rep / (dist * dist + 0.5); // soft-floor prevents blow-up
+            const fx   = (dx / dist) * f;
+            const fy   = (dy / dist) * f;
+            nodes[i].vx -= fx; nodes[i].vy -= fy;
+            nodes[j].vx += fx; nodes[j].vy += fy;
           }
         }
 
-        // Spring attraction along edges
+        // Link springs
+        const natLen = s.linkDist;
         for (const e of edges) {
-          const a = getNode(e.from);
-          const b = getNode(e.to);
+          const a = getNode(e.from), b = getNode(e.to);
           if (!a || !b) continue;
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-          const naturalLen = 90 + (a.conns + b.conns) * 6;
-          const force = (dist - naturalLen) * 0.006;
-          const fx = (dx / dist) * force;
-          const fy = (dy / dist) * force;
+          const dx   = b.x - a.x, dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const f    = (dist - natLen) * 0.065 * alpha;
+          const fx   = (dx / dist) * f, fy = (dy / dist) * f;
           a.vx += fx; a.vy += fy;
           b.vx -= fx; b.vy -= fy;
         }
 
-        // Gravity toward center
+        // Centering gravity (very light — lets graph breathe)
         for (const n of nodes) {
-          n.vx += (cx - n.x) * 0.00025;
-          n.vy += (cy - n.y) * 0.00025;
+          n.vx += (cx - n.x) * 0.00035 * alpha;
+          n.vy += (cy - n.y) * 0.00035 * alpha;
         }
       } else {
-        // Ring layout — pull toward ring positions
-        applyRingLayout();
+        ringForces();
       }
 
-      // Apply velocity with damping
+      // Integrate + Obsidian-style velocity decay (0.4 = strong damping → settles fast)
       for (const n of nodes) {
         if (n.id === dragRef.current) { n.vx = 0; n.vy = 0; continue; }
-        n.vx *= 0.85;
-        n.vy *= 0.85;
-        const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
-        if (speed > 8) { n.vx = (n.vx / speed) * 8; n.vy = (n.vy / speed) * 8; }
+        n.vx *= 0.55;
+        n.vy *= 0.55;
+        const spd = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+        const cap = 14 * alpha;
+        if (spd > cap) { n.vx = n.vx / spd * cap; n.vy = n.vy / spd * cap; }
         n.x += n.vx;
         n.y += n.vy;
       }
+
+      alphaRef.current *= 0.992; // exponential cool-down
     };
 
-    const hexToRgba = (hex: string, alpha: number): string => {
-      const c = hex.replace('#', '');
-      const r = parseInt(c.substring(0, 2), 16) || 0;
-      const g = parseInt(c.substring(2, 4), 16) || 0;
-      const b = parseInt(c.substring(4, 6), 16) || 0;
-      return `rgba(${r},${g},${b},${alpha})`;
-    };
-
+    // ── Draw ────────────────────────────────────────────────────────────────
     const draw = () => {
       if (!running) return;
       simulate();
 
-      const w = canvas.width;
-      const h = canvas.height;
+      const w = canvas.width, h = canvas.height;
       const z = zoomRef.current;
       const p = panRef.current;
       const nodes = nodesRef.current;
       const edges = edgesRef.current;
-      const activeId = state.activeNoteId;
-      const s = settingsRef.current;
+      const s = sRef.current;
       const q = query.toLowerCase();
 
-      // Obsidian-style deep dark background
-      ctx.fillStyle = BG;
+      // Background
+      ctx.fillStyle = OBS_BG;
       ctx.fillRect(0, 0, w, h);
 
-      // Fine dot grid
-      ctx.fillStyle = GRID_DOT;
-      const gs = 28 * z;
-      if (gs > 6) {
-        const ox = ((p.x % gs) + gs) % gs;
-        const oy = ((p.y % gs) + gs) % gs;
-        for (let x = ox; x < w; x += gs) {
-          for (let y = oy; y < h; y += gs) {
-            ctx.beginPath();
-            ctx.arc(x, y, 0.8, 0, Math.PI * 2);
-            ctx.fill();
+      // Dot grid — same density as Obsidian
+      const GS = 28 * z;
+      if (GS > 5) {
+        ctx.fillStyle = GRID_DOT;
+        const ox = ((p.x % GS) + GS) % GS;
+        const oy = ((p.y % GS) + GS) % GS;
+        for (let x = ox; x < w; x += GS)
+          for (let y = oy; y < h; y += GS) {
+            ctx.beginPath(); ctx.arc(x, y, 0.85, 0, Math.PI * 2); ctx.fill();
           }
-        }
       }
 
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.scale(z, z);
 
-      const cx = sizeRef.current.w / 2;
-      const cy = sizeRef.current.h / 2;
+      // ── Determine focused node: hover > open tab ───────────────────────
+      const focusId = hoverRef.current ?? state.activeNoteId ?? null;
 
-      // Ring guides (only in ring mode, or subtly in force)
-      if (layoutModeRef.current === 'ring') {
-        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-        ctx.lineWidth = 1 / z;
-        ctx.setLineDash([3, 8]);
-        for (let i = 1; i <= 4; i++) {
-          const r = s.radialSpread * (i * 0.35);
-          ctx.beginPath();
-          ctx.arc(cx, cy, r, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-        ctx.setLineDash([]);
+      // Build connected-to-focus sets
+      const connectedNodes = new Set<string>();
+      const connectedEdgeIdx = new Set<number>();
+      if (focusId) {
+        edges.forEach((e, i) => {
+          if (e.from === focusId || e.to === focusId) {
+            connectedNodes.add(e.from === focusId ? e.to : e.from);
+            connectedEdgeIdx.add(i);
+          }
+        });
       }
 
-      const isMatch = (n: GNode) => !q || n.title.toLowerCase().includes(q);
+      const hasFocus = focusId !== null;
+      const isMatch  = (n: GNode) => !q || n.title.toLowerCase().includes(q);
 
-      const getConnectedIds = (nodeId: string): Set<string> => {
-        const ids = new Set<string>();
-        edges.forEach(e => {
-          if (e.from === nodeId) ids.add(e.to);
-          if (e.to === nodeId) ids.add(e.from);
-        });
-        return ids;
-      };
+      // ── PASS 1: dim edges (all non-highlighted) ────────────────────────
+      ctx.lineWidth = s.lineWidth / z;
+      for (let i = 0; i < edges.length; i++) {
+        if (connectedEdgeIdx.has(i)) continue;
+        const a = getNode(edges[i].from), b = getNode(edges[i].to);
+        if (!a || !b || (q && !isMatch(a) && !isMatch(b))) continue;
 
-      const hoverConnected = hoverRef.current ? getConnectedIds(hoverRef.current) : new Set<string>();
-      const activeConnected = activeId ? getConnectedIds(activeId) : new Set<string>();
-
-      const getDash = (): number[] => {
-        if (s.lineDash === 'dashed') return [6, 4];
-        if (s.lineDash === 'dotted') return [2, 3];
-        return [];
-      };
-
-      // Draw edges with smooth curves
-      for (const e of edges) {
-        const a = getNode(e.from);
-        const b = getNode(e.to);
-        if (!a || !b) continue;
-        if (q && !isMatch(a) && !isMatch(b)) continue;
-
-        const isActiveEdge = activeId === e.from || activeId === e.to;
-        const isHoverEdge = hoverRef.current === e.from || hoverRef.current === e.to;
-        const highlight = isActiveEdge || isHoverEdge;
-
+        // When something is focused, all other edges fade hard (exact Obsidian behaviour)
+        const opacity = hasFocus ? s.lineOpacity * 0.12 : s.lineOpacity;
         ctx.beginPath();
-        // Slightly curved lines for Obsidian feel
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2;
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
-
-        if (highlight) {
-          ctx.strokeStyle = hexToRgba(s.activeLineColor, 0.9);
-          ctx.lineWidth = s.activeLineWidth / z;
-          ctx.setLineDash([]);
-        } else {
-          ctx.strokeStyle = hexToRgba(s.lineColor, s.lineOpacity);
-          ctx.lineWidth = s.lineWidth / z;
-          ctx.setLineDash(getDash());
-        }
-
+        ctx.strokeStyle = `rgba(180,185,200,${opacity})`;
         ctx.stroke();
       }
-      ctx.setLineDash([]);
 
-      // Nodes
+      // ── PASS 2: blue highlighted edges ────────────────────────────────
+      if (hasFocus) {
+        ctx.lineWidth = (s.lineWidth + 0.5) / z;
+        for (const i of connectedEdgeIdx) {
+          const a = getNode(edges[i].from), b = getNode(edges[i].to);
+          if (!a || !b) continue;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          // Obsidian blue lines: visible but not loud — 0.5 opacity is exactly right
+          ctx.strokeStyle = hexToRgba(OBS_BLUE, 0.5);
+          ctx.stroke();
+        }
+      }
+
+      // ── PASS 3: nodes ─────────────────────────────────────────────────
       for (const n of nodes) {
-        const dimmed = q && !isMatch(n);
-        if (dimmed) continue;
+        if (q && !isMatch(n)) continue;
 
-        const isActive = n.id === activeId;
-        const isHover = n.id === hoverRef.current;
-        const isConnectedToHover = hoverConnected.has(n.id);
-        const isConnectedToActive = activeConnected.has(n.id);
+        const isFocus     = n.id === focusId;
+        const isConnected = connectedNodes.has(n.id);
+        const isOpenNote  = n.id === state.activeNoteId;
 
-        const boost = Math.min(n.conns * s.connBoost, s.nodeBaseSize * 2);
+        // Radius — more connections → slightly larger, like Obsidian
+        const boost  = Math.min(n.conns * s.connBoost * 0.45, s.nodeBaseSize * 2);
         const radius = s.nodeBaseSize + boost;
 
-        // Obsidian-style outer glow
-        if (isActive || isHover) {
-          const glowRadius = radius * 4;
-          const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, glowRadius);
-          const glowColor = isActive ? s.activeNodeColor : s.nodeColor;
-          glow.addColorStop(0, hexToRgba(glowColor, isActive ? 0.35 : 0.2));
-          glow.addColorStop(0.4, hexToRgba(glowColor, isActive ? 0.12 : 0.07));
-          glow.addColorStop(1, hexToRgba(glowColor, 0));
+        // Very subtle glow on focused node only — Obsidian keeps this minimal
+        if (isFocus) {
+          const gr = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, radius * 3.2);
+          gr.addColorStop(0, hexToRgba(OBS_BLUE, 0.14));
+          gr.addColorStop(1, hexToRgba(OBS_BLUE, 0));
           ctx.beginPath();
-          ctx.arc(n.x, n.y, glowRadius, 0, Math.PI * 2);
-          ctx.fillStyle = glow;
+          ctx.arc(n.x, n.y, radius * 3.2, 0, Math.PI * 2);
+          ctx.fillStyle = gr;
           ctx.fill();
         }
 
-        // Connected-to-active: subtle highlight ring
-        if (isConnectedToActive && !isActive) {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, radius + 2.5 / z, 0, Math.PI * 2);
-          ctx.strokeStyle = hexToRgba(s.activeNodeColor, 0.3);
-          ctx.lineWidth = 1 / z;
-          ctx.stroke();
-        }
-
-        // Node circle
+        // Node fill colour
         ctx.beginPath();
         ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
 
-        if (isActive) {
-          // Obsidian active: bright with inner gradient
-          const grad = ctx.createRadialGradient(n.x - radius * 0.3, n.y - radius * 0.3, 0, n.x, n.y, radius);
-          grad.addColorStop(0, hexToRgba(s.activeNodeColor, 1));
-          grad.addColorStop(1, hexToRgba(s.activeNodeColor, 0.75));
-          ctx.fillStyle = grad;
-        } else if (isHover) {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 0.95);
-        } else if (isConnectedToHover || isConnectedToActive) {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 0.85);
+        if (isFocus || isOpenNote) {
+          // Focused / active: slightly blue-white tint — matches the screenshot
+          ctx.fillStyle = '#d6e0f5';
+        } else if (isConnected) {
+          // Neighbour nodes stay at full brightness
+          ctx.fillStyle = hasFocus
+            ? hexToRgba(s.nodeColor, 0.88)
+            : hexToRgba(s.nodeColor, 0.78);
         } else if (n.conns === 0) {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 0.28);
+          // Orphan: very dim — almost invisible when something is focused
+          ctx.fillStyle = hasFocus
+            ? hexToRgba(s.nodeColor, 0.08)
+            : hexToRgba(s.nodeColor, 0.3);
         } else {
-          ctx.fillStyle = hexToRgba(s.nodeColor, 0.65);
+          // Normal connected nodes: fade when something else is focused
+          ctx.fillStyle = hasFocus
+            ? hexToRgba(s.nodeColor, 0.14)
+            : hexToRgba(s.nodeColor, 0.72);
         }
         ctx.fill();
 
-        // Stroke ring
-        if (isActive) {
-          ctx.strokeStyle = hexToRgba(s.activeNodeColor, 0.9);
-          ctx.lineWidth = 1.5 / z;
-          ctx.stroke();
-        } else if (isHover) {
-          ctx.strokeStyle = hexToRgba(s.nodeColor, 0.7);
-          ctx.lineWidth = 1 / z;
-          ctx.stroke();
-        }
-
-        // Label rendering — Obsidian style
-        const showLabel = s.showAllLabels || isActive || isHover || isConnectedToHover || isConnectedToActive;
-        if (showLabel) {
-          const fontSize = (isActive ? 12 : isHover ? 11 : 10) / z;
-          ctx.font = `${isActive ? '500' : '400'} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-          ctx.textAlign = 'center';
-
-          const text = n.title.length > 28 ? n.title.slice(0, 26) + '…' : n.title;
-          const tw = ctx.measureText(text).width;
-          const tx = n.x;
-          const ty = n.y + radius + (14 / z);
-          const padH = 5 / z;
-          const padV = 3 / z;
-
-          // Pill background
-          ctx.fillStyle = 'rgba(13,13,13,0.78)';
-          const bx = tx - tw / 2 - padH;
-          const by = ty - fontSize;
-          const bw = tw + padH * 2;
-          const bh = fontSize + padV * 2;
-          const br = 3 / z;
+        // Thin blue ring on focused node
+        if (isFocus) {
           ctx.beginPath();
-          ctx.moveTo(bx + br, by);
-          ctx.lineTo(bx + bw - br, by);
-          ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + br);
-          ctx.lineTo(bx + bw, by + bh - br);
-          ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
-          ctx.lineTo(bx + br, by + bh);
-          ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - br);
-          ctx.lineTo(bx, by + br);
-          ctx.quadraticCurveTo(bx, by, bx + br, by);
-          ctx.closePath();
-          ctx.fill();
-
-          ctx.fillStyle = isActive
-            ? hexToRgba(s.activeNodeColor, 0.95)
-            : isHover
-            ? 'rgba(255,255,255,0.82)'
-            : 'rgba(255,255,255,0.55)';
-          ctx.fillText(text, tx, ty);
+          ctx.arc(n.x, n.y, radius + 2 / z, 0, Math.PI * 2);
+          ctx.strokeStyle = hexToRgba(OBS_BLUE, 0.42);
+          ctx.lineWidth   = 1.2 / z;
+          ctx.stroke();
         }
+
+        // ── Label ────────────────────────────────────────────────────────
+        const showLabel = s.showAllLabels || isFocus || isConnected || isOpenNote;
+        if (!showLabel) continue;
+
+        const fs   = (isFocus ? 12 : 10.5) / z;
+        const text = n.title.length > 30 ? n.title.slice(0, 28) + '…' : n.title;
+        ctx.font      = `${isFocus ? '500' : '400'} ${fs}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+        ctx.textAlign = 'center';
+
+        const tw   = ctx.measureText(text).width;
+        const tx   = n.x;
+        const ty   = n.y + radius + 13 / z;
+        const pH   = 5 / z, pV = 2.5 / z;
+
+        // Pill label background
+        const bx = tx - tw / 2 - pH, by = ty - fs;
+        const bw = tw + pH * 2,       bh = fs + pV * 2;
+        const br = 3 / z;
+        ctx.fillStyle = 'rgba(8,8,8,0.72)';
+        ctx.beginPath();
+        ctx.moveTo(bx + br, by);
+        ctx.lineTo(bx + bw - br, by);
+        ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + br);
+        ctx.lineTo(bx + bw, by + bh - br);
+        ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
+        ctx.lineTo(bx + br, by + bh);
+        ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - br);
+        ctx.lineTo(bx, by + br);
+        ctx.quadraticCurveTo(bx, by, bx + br, by);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = isFocus
+          ? 'rgba(255,255,255,0.92)'
+          : isConnected
+          ? 'rgba(210,218,235,0.78)'
+          : 'rgba(175,182,200,0.52)';
+        ctx.fillText(text, tx, ty);
       }
 
       ctx.restore();
@@ -570,29 +452,30 @@ export function GraphView() {
 
     animRef.current = requestAnimationFrame(draw);
     return () => { running = false; cancelAnimationFrame(animRef.current); };
-  }, [state.activeNoteId, state.notes, query, layoutMode, applyRingLayout]);
+  }, [state.activeNoteId, state.notes, query, layoutMode, ringForces]);
+
+  // ── Hit-test ────────────────────────────────────────────────────────────────
 
   const getNodeAt = useCallback((mx: number, my: number) => {
-    const z = zoomRef.current;
-    const p = panRef.current;
-    const wx = (mx - p.x) / z;
-    const wy = (my - p.y) / z;
-    const s = settingsRef.current;
+    const z = zoomRef.current, p = panRef.current;
+    const wx = (mx - p.x) / z, wy = (my - p.y) / z;
+    const s = sRef.current;
     for (const n of [...nodesRef.current].reverse()) {
-      const boost = Math.min(n.conns * s.connBoost, s.nodeBaseSize * 2);
-      const r = s.nodeBaseSize + boost + 6;
+      const boost = Math.min(n.conns * s.connBoost * 0.45, s.nodeBaseSize * 2);
+      const r     = s.nodeBaseSize + boost + 6;
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 < r * r) return n;
     }
     return null;
   }, []);
 
+  // ── Mouse / wheel ────────────────────────────────────────────────────────────
+
   const handleMouseDown = (e: React.MouseEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
     wasDragRef.current = false;
-    if (node) {
-      dragRef.current = node.id;
-    } else {
+    if (node) { dragRef.current = node.id; alphaRef.current = Math.max(alphaRef.current, 0.4); }
+    else {
       panRef.current.dragging = true;
       panRef.current.sx = e.clientX - panRef.current.x;
       panRef.current.sy = e.clientY - panRef.current.y;
@@ -601,20 +484,13 @@ export function GraphView() {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     if (dragRef.current) {
       wasDragRef.current = true;
-      const z = zoomRef.current;
-      const p = panRef.current;
+      const z = zoomRef.current, p = panRef.current;
       const node = nodesRef.current.find(n => n.id === dragRef.current);
-      if (node) {
-        node.x = (mx - p.x) / z;
-        node.y = (my - p.y) / z;
-        node.vx = 0;
-        node.vy = 0;
-      }
+      if (node) { node.x = (mx - p.x) / z; node.y = (my - p.y) / z; node.vx = 0; node.vy = 0; }
+      alphaRef.current = Math.max(alphaRef.current, 0.5);
     } else if (panRef.current.dragging) {
       panRef.current.x = e.clientX - panRef.current.sx;
       panRef.current.y = e.clientY - panRef.current.sy;
@@ -625,344 +501,242 @@ export function GraphView() {
     }
   };
 
-  const handleMouseUp = () => {
-    dragRef.current = null;
-    panRef.current.dragging = false;
-  };
+  const handleMouseUp  = () => { dragRef.current = null; panRef.current.dragging = false; };
 
   const handleClick = (e: React.MouseEvent) => {
     if (wasDragRef.current) { wasDragRef.current = false; return; }
     const rect = canvasRef.current!.getBoundingClientRect();
     const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
-    if (node) {
-      dispatch({ type: 'OPEN_TAB', payload: node.id });
-    }
+    if (node) dispatch({ type: 'OPEN_TAB', payload: node.id });
   };
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const rect = canvasRef.current!.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const oldZ = zoomRef.current;
-    const delta = e.deltaY > 0 ? 0.92 : 1.08;
-    const newZ = Math.max(0.1, Math.min(5, oldZ * delta));
+    const newZ = Math.max(0.08, Math.min(6, oldZ * (e.deltaY > 0 ? 0.92 : 1.09)));
     panRef.current.x = mx - (mx - panRef.current.x) * (newZ / oldZ);
     panRef.current.y = my - (my - panRef.current.y) * (newZ / oldZ);
-    zoomRef.current = newZ;
+    zoomRef.current  = newZ;
     setZoom(newZ);
   };
 
-  const handleZoom = (delta: number) => {
-    const cx = sizeRef.current.w / 2;
-    const cy = sizeRef.current.h / 2;
+  const doZoom = (delta: number) => {
+    const cx = sizeRef.current.w / 2, cy = sizeRef.current.h / 2;
     const oldZ = zoomRef.current;
-    const newZ = Math.max(0.1, Math.min(5, oldZ + delta));
+    const newZ = Math.max(0.08, Math.min(6, oldZ + delta));
     panRef.current.x = cx - (cx - panRef.current.x) * (newZ / oldZ);
     panRef.current.y = cy - (cy - panRef.current.y) * (newZ / oldZ);
-    zoomRef.current = newZ;
+    zoomRef.current  = newZ;
     setZoom(newZ);
   };
 
   const resetView = () => {
-    zoomRef.current = 1;
-    panRef.current = { x: 0, y: 0, dragging: false, sx: 0, sy: 0 };
+    zoomRef.current  = 1;
+    panRef.current   = { x: 0, y: 0, dragging: false, sx: 0, sy: 0 };
+    alphaRef.current = 1;
     setZoom(1);
     buildGraph();
   };
 
   const centerGraph = () => {
-    if (nodesRef.current.length === 0) return;
+    if (!nodesRef.current.length) return;
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     nodesRef.current.forEach(n => {
       minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x);
       minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y);
     });
-    const graphCx = (minX + maxX) / 2;
-    const graphCy = (minY + maxY) / 2;
-    panRef.current.x = sizeRef.current.w / 2 - graphCx * zoomRef.current;
-    panRef.current.y = sizeRef.current.h / 2 - graphCy * zoomRef.current;
+    panRef.current.x = sizeRef.current.w / 2 - ((minX + maxX) / 2) * zoomRef.current;
+    panRef.current.y = sizeRef.current.h / 2 - ((minY + maxY) / 2) * zoomRef.current;
   };
 
-  const dark = isDarkTheme();
-  const borderColor = 'rgba(255,255,255,0.07)';
-  const panelBg = 'rgba(18,18,18,0.96)';
-  const textMain = 'rgba(255,255,255,0.82)';
-  const textDim = 'rgba(255,255,255,0.35)';
-  const textSub = 'rgba(255,255,255,0.55)';
-  const inputBg = 'rgba(255,255,255,0.04)';
-  const accentPurple = '#7c6f9f';
+  // ── Style tokens ─────────────────────────────────────────────────────────────
 
-  const btnBase: React.CSSProperties = {
-    width: 32, height: 32, background: 'none', border: 'none',
-    color: textDim, cursor: 'pointer', borderRadius: 5,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.12s',
-  };
+  const border = 'rgba(255,255,255,0.07)';
+  const panel  = 'rgba(18,18,18,0.97)';
+  const tMain  = 'rgba(255,255,255,0.82)';
+  const tDim   = 'rgba(255,255,255,0.32)';
+  const tSub   = 'rgba(255,255,255,0.52)';
+  const iBg    = 'rgba(255,255,255,0.04)';
+
+  const iconBtn = (fn: () => void, icon: React.ReactNode, title: string) => (
+    <button
+      onClick={fn} title={title}
+      style={{ width: 32, height: 32, background: 'none', border: 'none', color: tDim, cursor: 'pointer', borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(74,158,245,0.13)'; e.currentTarget.style.color = tMain; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = tDim; }}
+    >{icon}</button>
+  );
+
+  // ── JSX ──────────────────────────────────────────────────────────────────────
 
   return (
-    <div
-      className="fixed inset-0 animate-fade-in"
-      style={{ zIndex: 110, background: '#0d0d0d' }}
-    >
+    <div className="fixed inset-0 animate-fade-in" style={{ zIndex: 110, background: OBS_BG }}>
+
+      {/* Canvas */}
       <canvas
         ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onClick={handleClick}
-        onWheel={handleWheel}
+        onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}    onMouseLeave={handleMouseUp}
+        onClick={handleClick}        onWheel={handleWheel}
         style={{ display: 'block', width: '100%', height: '100%', cursor: 'grab' }}
       />
 
-      {/* Header */}
-      <div
-        className="flex items-center justify-between"
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          padding: '9px 14px',
-          background: panelBg,
-          borderBottom: `1px solid ${borderColor}`,
-          backdropFilter: 'blur(14px)',
-          zIndex: 10,
-        }}
-      >
+      {/* ── Top header bar ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between" style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        padding: '8px 14px',
+        background: panel, borderBottom: `1px solid ${border}`,
+        backdropFilter: 'blur(14px)', zIndex: 10,
+      }}>
         <div className="flex items-center gap-3">
           <FlintLogo size={14} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: textSub, letterSpacing: 0.2 }}>
-            Graph View
-          </span>
-          <span style={{
-            fontSize: 10, color: textDim,
-            background: inputBg,
-            padding: '2px 8px', borderRadius: 4,
-            border: `1px solid ${borderColor}`,
-          }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: tSub, letterSpacing: 0.2 }}>Graph View</span>
+          <span style={{ fontSize: 10, color: tDim, background: iBg, padding: '2px 8px', borderRadius: 4, border: `1px solid ${border}` }}>
             {stats.nodes} nodes · {stats.edges} links
           </span>
 
-          {/* Layout toggle */}
-          <div style={{
-            display: 'flex',
-            background: inputBg,
-            border: `1px solid ${borderColor}`,
-            borderRadius: 6,
-            padding: 2,
-            gap: 2,
-          }}>
-            {(['force', 'ring'] as LayoutMode[]).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setLayoutMode(mode)}
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: 4,
-                  border: 'none',
-                  fontSize: 10,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  background: layoutMode === mode ? accentPurple : 'none',
-                  color: layoutMode === mode ? '#fff' : textDim,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {mode === 'force' ? 'Force' : 'Ring'}
+          {/* Force / Ring layout toggle */}
+          <div style={{ display: 'flex', background: iBg, border: `1px solid ${border}`, borderRadius: 6, padding: 2, gap: 2 }}>
+            {(['force', 'ring'] as LayoutMode[]).map(m => (
+              <button key={m} onClick={() => setLayoutMode(m)} style={{
+                padding: '3px 10px', borderRadius: 4, border: 'none', fontSize: 10,
+                fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
+                background: layoutMode === m ? OBS_BLUE : 'none',
+                color: layoutMode === m ? '#fff' : tDim,
+              }}>
+                {m === 'force' ? 'Force' : 'Ring'}
               </button>
             ))}
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2" style={{
-            padding: '5px 10px', background: inputBg,
-            border: `1px solid ${borderColor}`, borderRadius: 6,
-          }}>
-            <Search size={11} style={{ color: textDim }} />
-            <input
-              value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Filter nodes..."
-              style={{
-                background: 'none', border: 'none', outline: 'none',
-                color: textMain, fontSize: 12, width: 130,
-                fontFamily: 'inherit',
-              }}
-            />
+          {/* Search */}
+          <div className="flex items-center gap-2" style={{ padding: '5px 10px', background: iBg, border: `1px solid ${border}`, borderRadius: 6 }}>
+            <Search size={11} style={{ color: tDim }} />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter nodes…"
+              style={{ background: 'none', border: 'none', outline: 'none', color: tMain, fontSize: 12, width: 130, fontFamily: 'inherit' }} />
             {query && (
-              <button onClick={() => setQuery('')}
-                style={{ background: 'none', border: 'none', color: textDim, cursor: 'pointer', display: 'flex', padding: 0 }}>
+              <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', color: tDim, cursor: 'pointer', display: 'flex', padding: 0 }}>
                 <X size={11} />
               </button>
             )}
           </div>
 
-          <span style={{
-            fontSize: 10, color: textDim, minWidth: 38,
-            textAlign: 'center', fontVariantNumeric: 'tabular-nums',
-          }}>
+          <span style={{ fontSize: 10, color: tDim, minWidth: 38, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
             {Math.round(zoom * 100)}%
           </span>
 
-          <button
-            onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })}
-            style={{ background: 'none', border: 'none', color: textDim, cursor: 'pointer', display: 'flex', padding: 4, borderRadius: 4 }}
-            onMouseEnter={e => { e.currentTarget.style.color = textMain; e.currentTarget.style.background = inputBg; }}
-            onMouseLeave={e => { e.currentTarget.style.color = textDim; e.currentTarget.style.background = 'none'; }}
-          >
+          <button onClick={() => dispatch({ type: 'TOGGLE_GRAPH_VIEW' })}
+            style={{ background: 'none', border: 'none', color: tDim, cursor: 'pointer', display: 'flex', padding: 4, borderRadius: 4 }}
+            onMouseEnter={e => { e.currentTarget.style.color = tMain; e.currentTarget.style.background = iBg; }}
+            onMouseLeave={e => { e.currentTarget.style.color = tDim; e.currentTarget.style.background = 'none'; }}>
             <X size={16} />
           </button>
         </div>
       </div>
 
-      {/* Settings Panel */}
+      {/* ── Settings panel ─────────────────────────────────────────────────── */}
       <div style={{
-        position: 'absolute', top: 54, right: 12, width: 236,
-        background: panelBg, backdropFilter: 'blur(14px)',
-        border: `1px solid ${borderColor}`, borderRadius: 8,
-        overflow: 'hidden',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        position: 'absolute', top: 52, right: 12, width: 232,
+        background: panel, backdropFilter: 'blur(14px)',
+        border: `1px solid ${border}`, borderRadius: 8,
+        overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
       }}>
-        <button
-          onClick={() => setSettingsOpen(!settingsOpen)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', padding: '9px 12px',
-            background: 'none', border: 'none', color: textMain, cursor: 'pointer',
-            borderBottom: settingsOpen ? `1px solid ${borderColor}` : 'none',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Settings size={12} style={{ color: textDim }} />
-            <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0.2 }}>Appearance</span>
+        <button onClick={() => setSettingsOpen(o => !o)} style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '9px 12px', background: 'none', border: 'none', color: tMain, cursor: 'pointer',
+          borderBottom: settingsOpen ? `1px solid ${border}` : 'none',
+        }}>
+          <div className="flex items-center gap-2">
+            <Settings size={12} style={{ color: tDim }} />
+            <span style={{ fontSize: 11, fontWeight: 500 }}>Appearance</span>
           </div>
-          {settingsOpen ? <ChevronDown size={12} style={{ color: textDim }} /> : <ChevronRight size={12} style={{ color: textDim }} />}
+          {settingsOpen ? <ChevronDown size={12} style={{ color: tDim }} /> : <ChevronRight size={12} style={{ color: tDim }} />}
         </button>
 
         {settingsOpen && (
-          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '65vh', overflowY: 'auto' }}>
+          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '62vh', overflowY: 'auto' }}>
 
             {/* Nodes */}
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Nodes
-              </div>
+            <section>
+              <p style={{ fontSize: 9, fontWeight: 700, color: tDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Nodes</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {[
-                  { label: 'Color', el: <input type="color" value={nodeColor} onChange={e => setNodeColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer', background: 'none' }} /> },
-                  { label: 'Active', el: <input type="color" value={activeNodeColor} onChange={e => setActiveNodeColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer', background: 'none' }} /> },
-                ].map(({ label, el }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: textSub, width: 60 }}>{label}</span>
-                    {el}
+                  { l: 'Colour', el: <input type="color" value={nodeColor}   onChange={e => setNodeColor(e.target.value)}   style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} /> },
+                  { l: 'Active', el: <input type="color" value={activeColor} onChange={e => setActiveColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} /> },
+                ].map(({ l, el }) => (
+                  <div key={l} className="flex items-center gap-2">
+                    <span style={{ fontSize: 11, color: tSub, width: 58 }}>{l}</span>{el}
                   </div>
                 ))}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Size</span>
-                  <input type="range" min={2} max={10} step={0.5} value={nodeBaseSize}
-                    onChange={e => setNodeBaseSize(parseFloat(e.target.value))} style={{ flex: 1, accentColor: accentPurple }} />
-                  <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{nodeBaseSize}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Boost</span>
-                  <input type="range" min={0} max={3} step={0.2} value={connBoost}
-                    onChange={e => setConnBoost(parseFloat(e.target.value))} style={{ flex: 1, accentColor: accentPurple }} />
-                  <span style={{ fontSize: 10, color: textDim, width: 20, textAlign: 'right' }}>{connBoost}</span>
-                </div>
+                {([
+                  { l: 'Size',  min: 2,  max: 12, st: 0.5, v: nodeBaseSize, s: setNodeBaseSize as (v: number) => void },
+                  { l: 'Boost', min: 0,  max: 4,  st: 0.2, v: connBoost,    s: setConnBoost    as (v: number) => void },
+                ] as const).map(({ l, min, max, st, v, s }) => (
+                  <div key={l} className="flex items-center gap-2">
+                    <span style={{ fontSize: 11, color: tSub, width: 58 }}>{l}</span>
+                    <input type="range" min={min} max={max} step={st} value={v} onChange={e => s(parseFloat(e.target.value))} style={{ flex: 1, accentColor: OBS_BLUE }} />
+                    <span style={{ fontSize: 10, color: tDim, width: 22, textAlign: 'right' }}>{v}</span>
+                  </div>
+                ))}
               </div>
-            </div>
+            </section>
 
             {/* Lines */}
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Lines
-              </div>
+            <section>
+              <p style={{ fontSize: 9, fontWeight: 700, color: tDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Lines</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {[
-                  { label: 'Color', el: <input type="color" value={lineColor} onChange={e => setLineColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} /> },
-                  { label: 'Active', el: <input type="color" value={activeLineColor} onChange={e => setActiveLineColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} /> },
-                ].map(({ label, el }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: textSub, width: 60 }}>{label}</span>
-                    {el}
-                  </div>
-                ))}
-                {[
-                  { label: 'Width', min: 0.5, max: 4, step: 0.1, value: lineWidth, set: setLineWidth },
-                  { label: 'Highlight', min: 1, max: 5, step: 0.2, value: activeLineWidth, set: setActiveLineWidth },
-                  { label: 'Opacity', min: 0.1, max: 1, step: 0.05, value: lineOpacity, set: setLineOpacity, fmt: (v: number) => v.toFixed(1) },
-                ].map(({ label, min, max, step, value, set, fmt }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: textSub, width: 60 }}>{label}</span>
-                    <input type="range" min={min} max={max} step={step} value={value}
-                      onChange={e => (set as (v: number) => void)(parseFloat(e.target.value))}
-                      style={{ flex: 1, accentColor: accentPurple }} />
-                    <span style={{ fontSize: 10, color: textDim, width: 24, textAlign: 'right' }}>
-                      {fmt ? fmt(value) : value}
-                    </span>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Style</span>
-                  <select
-                    value={lineDash}
-                    onChange={e => setLineDash(e.target.value as 'solid' | 'dashed' | 'dotted')}
-                    style={{
-                      flex: 1, background: inputBg, border: `1px solid ${borderColor}`,
-                      borderRadius: 4, padding: '3px 6px', color: textSub,
-                      fontSize: 11, outline: 'none', cursor: 'pointer',
-                    }}
-                  >
-                    <option value="solid">Solid</option>
-                    <option value="dashed">Dashed</option>
-                    <option value="dotted">Dotted</option>
-                  </select>
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: 11, color: tSub, width: 58 }}>Colour</span>
+                  <input type="color" value={lineColor} onChange={e => setLineColor(e.target.value)} style={{ width: 22, height: 18, border: 'none', borderRadius: 3, padding: 0, cursor: 'pointer' }} />
                 </div>
+                {([
+                  { l: 'Width',   min: 0.3, max: 3,  st: 0.1,  v: lineWidth,   s: setLineWidth   as (v: number) => void, fmt: undefined },
+                  { l: 'Opacity', min: 0.05,max: 1,  st: 0.05, v: lineOpacity, s: setLineOpacity as (v: number) => void, fmt: (x: number) => x.toFixed(2) },
+                ] as const).map(({ l, min, max, st, v, s, fmt }) => (
+                  <div key={l} className="flex items-center gap-2">
+                    <span style={{ fontSize: 11, color: tSub, width: 58 }}>{l}</span>
+                    <input type="range" min={min} max={max} step={st} value={v} onChange={e => s(parseFloat(e.target.value))} style={{ flex: 1, accentColor: OBS_BLUE }} />
+                    <span style={{ fontSize: 10, color: tDim, width: 28, textAlign: 'right' }}>{fmt ? fmt(v) : v}</span>
+                  </div>
+                ))}
               </div>
-            </div>
+            </section>
 
-            {/* Layout */}
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-                Layout
-              </div>
+            {/* Physics */}
+            <section>
+              <p style={{ fontSize: 9, fontWeight: 700, color: tDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Physics</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 11, color: textSub, width: 60 }}>Spread</span>
-                  <input type="range" min={100} max={500} step={10} value={radialSpread}
-                    onChange={e => setRadialSpread(parseInt(e.target.value))}
-                    style={{ flex: 1, accentColor: accentPurple }} />
-                  <span style={{ fontSize: 10, color: textDim, width: 24, textAlign: 'right' }}>{radialSpread}</span>
-                </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: textSub, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={showAllLabels}
-                    onChange={e => setShowAllLabels(e.target.checked)}
-                    style={{ accentColor: accentPurple }}
-                  />
+                {([
+                  { l: 'Repulsion', min: 30, max: 300, st: 10, v: repulsion, s: setRepulsion as (v: number) => void },
+                  { l: 'Link dist', min: 30, max: 200, st: 5,  v: linkDist,  s: setLinkDist  as (v: number) => void },
+                ] as const).map(({ l, min, max, st, v, s }) => (
+                  <div key={l} className="flex items-center gap-2">
+                    <span style={{ fontSize: 11, color: tSub, width: 58 }}>{l}</span>
+                    <input type="range" min={min} max={max} step={st} value={v} onChange={e => s(parseInt(e.target.value))} style={{ flex: 1, accentColor: OBS_BLUE }} />
+                    <span style={{ fontSize: 10, color: tDim, width: 28, textAlign: 'right' }}>{v}</span>
+                  </div>
+                ))}
+                <label className="flex items-center gap-2" style={{ fontSize: 11, color: tSub, cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={showAllLabels} onChange={e => setShowAllLabels(e.target.checked)} style={{ accentColor: OBS_BLUE }} />
                   Show all labels
                 </label>
               </div>
-            </div>
+            </section>
 
             {/* Reset */}
             <button
               onClick={() => {
-                setNodeColor('#7c6f9f'); setActiveNodeColor('#a78bfa');
-                setLineColor('#4a4460'); setActiveLineColor('#7c6f9f');
-                setNodeBaseSize(4); setConnBoost(1.2);
-                setLineWidth(1); setActiveLineWidth(2.0);
-                setLineOpacity(0.5); setLineDash('solid');
-                setShowAllLabels(false); setRadialSpread(220);
+                setNodeColor(OBS_NODE_BASE); setActiveColor(OBS_BLUE); setLineColor('#6b7280');
+                setNodeBaseSize(5); setConnBoost(1.5); setLineWidth(1); setLineOpacity(0.5);
+                setShowAllLabels(false); setRepulsion(120); setLinkDist(85);
               }}
-              style={{
-                width: '100%', padding: '7px 0',
-                background: inputBg, border: `1px solid ${borderColor}`,
-                borderRadius: 6, color: textSub, cursor: 'pointer',
-                fontSize: 11, fontWeight: 500, letterSpacing: 0.2,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,111,159,0.15)'; e.currentTarget.style.color = textMain; }}
-              onMouseLeave={e => { e.currentTarget.style.background = inputBg; e.currentTarget.style.color = textSub; }}
+              style={{ width: '100%', padding: '7px 0', background: iBg, border: `1px solid ${border}`, borderRadius: 6, color: tSub, cursor: 'pointer', fontSize: 11 }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(74,158,245,0.12)'; e.currentTarget.style.color = tMain; }}
+              onMouseLeave={e => { e.currentTarget.style.background = iBg; e.currentTarget.style.color = tSub; }}
             >
               Reset to defaults
             </button>
@@ -970,75 +744,40 @@ export function GraphView() {
         )}
       </div>
 
-      {/* Zoom controls */}
+      {/* ── Zoom controls ───────────────────────────────────────────────────── */}
       <div style={{
         position: 'absolute', bottom: 16, right: 12,
         display: 'flex', flexDirection: 'column', gap: 1,
-        background: panelBg, border: `1px solid ${borderColor}`,
+        background: panel, border: `1px solid ${border}`,
         borderRadius: 8, padding: 3, backdropFilter: 'blur(12px)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
       }}>
-        {[
-          { icon: <ZoomIn size={13} />, fn: () => handleZoom(0.2), t: 'Zoom in' },
-          { icon: <ZoomOut size={13} />, fn: () => handleZoom(-0.2), t: 'Zoom out' },
-          { icon: <Maximize2 size={13} />, fn: centerGraph, t: 'Center graph' },
-          { icon: <RotateCcw size={13} />, fn: resetView, t: 'Reset view' },
-        ].map((b, i) => (
-          <button
-            key={i}
-            onClick={b.fn}
-            title={b.t}
-            style={btnBase}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(124,111,159,0.18)';
-              e.currentTarget.style.color = textMain;
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'none';
-              e.currentTarget.style.color = textDim;
-            }}
-          >
-            {b.icon}
-          </button>
-        ))}
+        {iconBtn(() => doZoom(0.25),  <ZoomIn    size={13} />, 'Zoom in'      )}
+        {iconBtn(() => doZoom(-0.25), <ZoomOut   size={13} />, 'Zoom out'     )}
+        {iconBtn(centerGraph,          <Maximize2 size={13} />, 'Center graph' )}
+        {iconBtn(resetView,            <RotateCcw size={13} />, 'Reset view'   )}
       </div>
 
-      {/* Legend */}
+      {/* ── Legend ─────────────────────────────────────────────────────────── */}
       <div style={{
         position: 'absolute', bottom: 16, left: 12,
-        background: panelBg, border: `1px solid ${borderColor}`,
+        background: panel, border: `1px solid ${border}`,
         borderRadius: 8, padding: '10px 13px',
-        backdropFilter: 'blur(12px)',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
       }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: textDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-          Legend
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {[
-            { size: 8, color: activeNodeColor, opacity: 1, label: 'Active note', border: activeNodeColor },
-            { size: 7, color: nodeColor, opacity: 0.85, label: 'Connected' },
-            { size: 5, color: nodeColor, opacity: 0.28, label: 'Orphan' },
-          ].map(({ size, color, opacity, label, border }) => (
-            <div key={label} className="flex items-center gap-2">
-              <div style={{
-                width: size, height: size, borderRadius: '50%',
-                background: color, opacity,
-                flexShrink: 0,
-                ...(border ? { boxShadow: `0 0 6px ${border}60` } : {}),
-              }} />
-              <span style={{ fontSize: 10, color: textSub }}>{label}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{
-          marginTop: 8, paddingTop: 8,
-          borderTop: `1px solid ${borderColor}`,
-          fontSize: 9, color: textDim, lineHeight: 1.7,
-        }}>
-          Scroll to zoom · Drag to pan
-          <br />
-          Click node to open · Drag node to move
+        <p style={{ fontSize: 9, fontWeight: 700, color: tDim, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.9 }}>Legend</p>
+        {[
+          { size: 8,   bg: '#d6e0f5',    opacity: 1,    label: 'Focused / open' },
+          { size: 6.5, bg: OBS_NODE_BASE,opacity: 0.82, label: 'Connected' },
+          { size: 4,   bg: OBS_NODE_BASE,opacity: 0.28, label: 'Orphan' },
+        ].map(({ size, bg, opacity, label }) => (
+          <div key={label} className="flex items-center gap-2" style={{ marginBottom: 5 }}>
+            <div style={{ width: size, height: size, borderRadius: '50%', background: bg, opacity, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: tSub }}>{label}</span>
+          </div>
+        ))}
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${border}`, fontSize: 9, color: tDim, lineHeight: 1.7 }}>
+          Scroll to zoom · Drag to pan<br />Click node to open
         </div>
       </div>
     </div>
