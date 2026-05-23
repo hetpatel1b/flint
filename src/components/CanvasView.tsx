@@ -43,20 +43,20 @@ function saveCanvasState(vaultId: string | null, data: CanvasPersistedState) {
 // ─── Card color palette (Obsidian-style) ──────────────────────────────────────
 
 const CARD_COLORS = [
-  { label: 'Default', border: 'rgba(255,255,255,0.09)', glow: '' },
-  { label: 'Red',     border: '#c0544d',                glow: 'rgba(192,84,77,0.18)' },
-  { label: 'Orange',  border: '#c07d40',                glow: 'rgba(192,125,64,0.18)' },
-  { label: 'Yellow',  border: '#b09840',                glow: 'rgba(176,152,64,0.18)' },
-  { label: 'Green',   border: '#4a9460',                glow: 'rgba(74,148,96,0.18)' },
-  { label: 'Cyan',    border: '#3a8899',                glow: 'rgba(58,136,153,0.18)' },
-  { label: 'Purple',  border: '#7c6f9f',                glow: 'rgba(124,111,159,0.18)' },
-  { label: 'Pink',    border: '#9f507a',                glow: 'rgba(159,80,122,0.18)' },
+  { label: 'Default', border: '#3a3a3a', glow: '' },
+  { label: 'Red',     border: '#e5555a', glow: 'rgba(229,85,90,0.15)' },
+  { label: 'Orange',  border: '#e68a00', glow: 'rgba(230,138,0,0.15)' },
+  { label: 'Yellow',  border: '#c9b400', glow: 'rgba(201,180,0,0.15)' },
+  { label: 'Green',   border: '#43a047', glow: 'rgba(67,160,71,0.15)' },
+  { label: 'Cyan',    border: '#00acc1', glow: 'rgba(0,172,193,0.15)' },
+  { label: 'Purple',  border: '#7f6df2', glow: 'rgba(127,109,242,0.15)' },
+  { label: 'Pink',    border: '#e040a0', glow: 'rgba(224,64,160,0.15)' },
 ];
 
 // ─── Connection colors ────────────────────────────────────────────────────────
 
 const CONN_COLORS = [
-  '#6b7280', '#7c6f9f', '#4a9460', '#c0544d', '#3a8899', '#c07d40',
+  '#555555', '#7f6df2', '#43a047', '#e5555a', '#00acc1', '#e68a00',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ function nearestSide(
 }
 
 function bezierPath(x1: number, y1: number, x2: number, y2: number) {
-  const dx = Math.abs(x2 - x1) * 0.55 + 40;
+  const dx = Math.abs(x2 - x1) * 0.5 + 30;
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
@@ -338,10 +338,15 @@ export function CanvasView() {
 
   const findCard = (id: string) => filteredCards.find(c => c.id === id);
 
-  // ── Obsidian color palette ─────────────────────────────────────────────────
-  const borderColorDefault = 'rgba(255,255,255,0.07)';
-  const surfaceBg = 'rgba(22,22,22,0.97)';
-  const surfaceBgActive = 'rgba(30,28,38,0.98)';
+  // ── Obsidian aesthetic constants ─────────────────────────────────────────
+  const accentColor = '#7f6df2';
+  const canvasBg = '#1c1c1c';
+  const cardBg = '#2b2b2b';
+  const cardBgActive = '#303030';
+  const cardBorderDefault = '#3a3a3a';
+  const textPrimary = '#dcddde';
+  const textSecondary = '#999999';
+  const textMuted = '#666666';
 
   // ─── Render connection SVG path ───────────────────────────────────────────
   const renderConnections = () => {
@@ -358,8 +363,8 @@ export function CanvasView() {
         <g key={`wiki-${edge.from}-${edge.to}`}>
           <path
             d={bezierPath(p1.x, p1.y, p2.x, p2.y)}
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth={1 / zoom}
+            stroke="#4a4a4a"
+            strokeWidth={1.2 / zoom}
             strokeDasharray={`${4 / zoom} ${4 / zoom}`}
             fill="none"
             markerEnd="url(#arrow-dim)"
@@ -375,7 +380,7 @@ export function CanvasView() {
       if (!from || !to) return;
       const p1 = getSidePt(from, conn.fromSide);
       const p2 = getSidePt(to, conn.toSide);
-      const color = conn.color || '#7c6f9f';
+      const color = conn.color || accentColor;
       const midX = (p1.x + p2.x) / 2;
       const midY = (p1.y + p2.y) / 2;
 
@@ -385,7 +390,7 @@ export function CanvasView() {
           <path
             d={bezierPath(p1.x, p1.y, p2.x, p2.y)}
             stroke="transparent"
-            strokeWidth={12 / zoom}
+            strokeWidth={14 / zoom}
             fill="none"
             style={{ cursor: 'pointer' }}
             onClick={() => deleteConnection(conn.id)}
@@ -393,9 +398,9 @@ export function CanvasView() {
           <path
             d={bezierPath(p1.x, p1.y, p2.x, p2.y)}
             stroke={color}
-            strokeWidth={1.5 / zoom}
+            strokeWidth={1.8 / zoom}
             fill="none"
-            strokeOpacity={0.75}
+            strokeOpacity={0.8}
             markerEnd={`url(#arrow-colored-${conn.id})`}
             style={{ pointerEvents: 'none' }}
           />
@@ -405,12 +410,12 @@ export function CanvasView() {
             style={{ cursor: 'pointer' }}
             onClick={() => deleteConnection(conn.id)}
           >
-            <circle r={7 / zoom} fill="rgba(18,18,18,0.9)" stroke={color} strokeWidth={1 / zoom} />
+            <circle r={8 / zoom} fill="#1c1c1c" stroke={color} strokeWidth={1.2 / zoom} />
             <text
               x={0} y={1}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize={8 / zoom}
+              fontSize={9 / zoom}
               fill={color}
               style={{ userSelect: 'none', pointerEvents: 'none' }}
             >
@@ -428,7 +433,7 @@ export function CanvasView() {
     <div
       ref={containerRef}
       className="fixed inset-0 animate-fade-in overflow-hidden select-none"
-      style={{ zIndex: 110, background: '#0d0d0d' }}
+      style={{ zIndex: 110, background: canvasBg }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -439,9 +444,9 @@ export function CanvasView() {
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.045) 0.8px, transparent 0.8px)`,
-          backgroundSize: `${28 * zoom}px ${28 * zoom}px`,
-          backgroundPosition: `${pan.x % (28 * zoom)}px ${pan.y % (28 * zoom)}px`,
+          backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)`,
+          backgroundSize: `${24 * zoom}px ${24 * zoom}px`,
+          backgroundPosition: `${pan.x % (24 * zoom)}px ${pan.y % (24 * zoom)}px`,
           pointerEvents: 'none',
         }}
       />
@@ -458,7 +463,7 @@ export function CanvasView() {
         <defs>
           {/* Dim arrow for wikilinks */}
           <marker id="arrow-dim" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-            <path d="M0,0 L0,7 L7,3.5 z" fill="rgba(255,255,255,0.15)" />
+            <path d="M0,0 L0,7 L7,3.5 z" fill="#4a4a4a" />
           </marker>
           {/* Colored arrows for manual connections */}
           {connections.map(conn => (
@@ -467,12 +472,12 @@ export function CanvasView() {
               id={`arrow-colored-${conn.id}`}
               markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"
             >
-              <path d="M0,0 L0,7 L7,3.5 z" fill={conn.color || '#7c6f9f'} fillOpacity={0.75} />
+              <path d="M0,0 L0,7 L7,3.5 z" fill={conn.color || accentColor} fillOpacity={0.8} />
             </marker>
           ))}
           {/* Live drag arrow */}
           <marker id="arrow-live" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-            <path d="M0,0 L0,7 L7,3.5 z" fill="#a78bfa" fillOpacity={0.8} />
+            <path d="M0,0 L0,7 L7,3.5 z" fill={accentColor} fillOpacity={0.8} />
           </marker>
         </defs>
 
@@ -487,8 +492,8 @@ export function CanvasView() {
             return (
               <path
                 d={bezierPath(p1.x, p1.y, connDrag.mx, connDrag.my)}
-                stroke="#a78bfa"
-                strokeWidth={1.5 / zoom}
+                stroke={accentColor}
+                strokeWidth={1.8 / zoom}
                 strokeDasharray={`${5 / zoom} ${3 / zoom}`}
                 fill="none"
                 strokeOpacity={0.7}
@@ -530,27 +535,29 @@ export function CanvasView() {
           const isColorPickerOpen = colorPickerOpen === card.id;
 
           const cardBorder = isActive
-            ? 'rgba(167,139,250,0.5)'
-            : cardColor.border;
+            ? accentColor
+            : colorIdx > 0 
+            ? cardColor.border 
+            : cardBorderDefault;
 
           const SIDES: Array<'top' | 'right' | 'bottom' | 'left'> = ['top', 'right', 'bottom', 'left'];
           const sideStyle = (side: 'top' | 'right' | 'bottom' | 'left'): React.CSSProperties => {
             const base: React.CSSProperties = {
               position: 'absolute',
-              background: '#a78bfa',
+              background: accentColor,
               borderRadius: '50%',
-              width: 10 / zoom,
-              height: 10 / zoom,
+              width: 8 / zoom,
+              height: 8 / zoom,
               zIndex: 5,
               cursor: 'crosshair',
               opacity: 0,
-              transition: 'opacity 0.1s',
-              transform: 'translate(-50%, -50%)',
+              transition: 'opacity 0.15s ease, transform 0.15s ease',
+              boxShadow: `0 0 4px rgba(127, 109, 242, 0.4)`,
             };
-            if (side === 'top')    return { ...base, top: 0, left: '50%' };
-            if (side === 'bottom') return { ...base, bottom: -10 / zoom, left: '50%', transform: 'translate(-50%, 0)' };
-            if (side === 'left')   return { ...base, top: '50%', left: 0 };
-            return { ...base, top: '50%', right: -10 / zoom, left: 'auto', transform: 'translate(0, -50%)' };
+            if (side === 'top')    return { ...base, top: 0, left: '50%', transform: 'translate(-50%, -50%)' };
+            if (side === 'bottom') return { ...base, bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' };
+            if (side === 'left')   return { ...base, top: '50%', left: 0, transform: 'translate(-50%, -50%)' };
+            return { ...base, top: '50%', right: 0, transform: 'translate(50%, -50%)' };
           };
 
           return (
@@ -563,17 +570,18 @@ export function CanvasView() {
                 top: card.y,
                 width: card.w,
                 minHeight: card.h,
-                background: isActive ? surfaceBgActive : surfaceBg,
+                background: isActive ? cardBgActive : cardBg,
                 border: `${1 / zoom}px solid ${cardBorder}`,
-                borderRadius: 6 / zoom,
+                borderRadius: 8 / zoom,
                 boxShadow: isActive
-                  ? `0 0 0 ${2 / zoom}px rgba(167,139,250,0.12), 0 8px 32px rgba(0,0,0,0.6)`
+                  ? `0 0 0 1px rgba(127,109,242,0.2), 0 0 16px rgba(127,109,242,0.2), 0 8px 32px rgba(0,0,0,0.5)`
                   : cardColor.glow
-                  ? `0 0 0 ${1 / zoom}px ${cardColor.glow}, 0 4px 18px rgba(0,0,0,0.5)`
-                  : '0 4px 18px rgba(0,0,0,0.5)',
+                  ? `0 0 0 1px ${cardColor.glow}, 0 6px 20px rgba(0,0,0,0.4)`
+                  : '0 6px 20px rgba(0,0,0,0.4)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'visible',
+                transition: 'box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease',
               }}
               onClick={e => {
                 e.stopPropagation();
@@ -582,8 +590,8 @@ export function CanvasView() {
             >
               {/* Connection dots — shown on hover via CSS */}
               <style>{`
-                .canvas-card-root:hover .conn-dot { opacity: 0.75 !important; }
-                .conn-dot:hover { opacity: 1 !important; background: #c4b5fd !important; }
+                .canvas-card-root:hover .conn-dot { opacity: 0.85 !important; }
+                .conn-dot:hover { opacity: 1 !important; transform: scale(1.3) !important; background: #9f94f7 !important; }
               `}</style>
 
               {SIDES.map(side => (
@@ -619,23 +627,25 @@ export function CanvasView() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: `${6 / zoom}px ${8 / zoom}px`,
-                  borderBottom: `${1 / zoom}px solid rgba(255,255,255,0.04)`,
+                  borderBottom: `${1 / zoom}px solid rgba(255,255,255,0.05)`,
                   cursor: 'grab',
-                  background: 'rgba(0,0,0,0.25)',
+                  background: 'rgba(0,0,0,0.15)',
                   flexShrink: 0,
-                  borderRadius: `${6 / zoom}px ${6 / zoom}px 0 0`,
+                  borderRadius: `${8 / zoom}px ${8 / zoom}px 0 0`,
+                  transition: 'background 0.15s ease',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 / zoom, minWidth: 0, flex: 1 }}>
-                  <Grip size={9 / zoom} style={{ color: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
-                  {isNote && <FileText size={9 / zoom} style={{ color: 'rgba(255,255,255,0.28)', flexShrink: 0 }} />}
+                  <Grip size={9 / zoom} style={{ color: textMuted, flexShrink: 0 }} />
+                  {isNote && <FileText size={9 / zoom} style={{ color: textMuted, flexShrink: 0 }} />}
                   <span style={{
                     fontSize: 11 / zoom,
                     fontWeight: 500,
-                    color: isActive ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.52)',
+                    color: isActive ? textPrimary : textSecondary,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    transition: 'color 0.15s ease',
                   }}>
                     {titleLine}
                   </span>
@@ -653,14 +663,16 @@ export function CanvasView() {
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       padding: `${2 / zoom}px`, display: 'flex', borderRadius: 3 / zoom,
+                      transition: 'background 0.15s ease',
                     }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
                   >
                     <div style={{
                       width: 9 / zoom, height: 9 / zoom, borderRadius: '50%',
-                      background: cardColor.border === 'rgba(255,255,255,0.09)'
-                        ? 'rgba(255,255,255,0.2)'
-                        : cardColor.border,
-                      border: `${1 / zoom}px solid rgba(255,255,255,0.2)`,
+                      background: colorIdx > 0 ? cardColor.border : 'rgba(255,255,255,0.25)',
+                      border: `${1 / zoom}px solid rgba(255,255,255,0.15)`,
+                      transition: 'background 0.15s ease',
                     }} />
                   </button>
 
@@ -674,15 +686,16 @@ export function CanvasView() {
                       title="Open note"
                       style={{
                         background: 'none', border: 'none',
-                        color: 'rgba(255,255,255,0.22)', cursor: 'pointer',
+                        color: textMuted, cursor: 'pointer',
                         padding: `${2 / zoom}px`, display: 'flex', borderRadius: 3 / zoom,
+                        transition: 'color 0.15s ease, background 0.15s ease',
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+                        e.currentTarget.style.color = textPrimary;
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.color = 'rgba(255,255,255,0.22)';
+                        e.currentTarget.style.color = textMuted;
                         e.currentTarget.style.background = 'none';
                       }}
                     >
@@ -695,15 +708,16 @@ export function CanvasView() {
                     title="Remove from canvas"
                     style={{
                       background: 'none', border: 'none',
-                      color: 'rgba(255,255,255,0.22)', cursor: 'pointer',
+                      color: textMuted, cursor: 'pointer',
                       padding: `${2 / zoom}px`, display: 'flex', borderRadius: 3 / zoom,
+                      transition: 'color 0.15s ease, background 0.15s ease',
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.color = 'rgba(200,70,70,0.85)';
-                      e.currentTarget.style.background = 'rgba(200,70,70,0.1)';
+                      e.currentTarget.style.color = '#e5555a';
+                      e.currentTarget.style.background = 'rgba(229,85,90,0.1)';
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.color = 'rgba(255,255,255,0.22)';
+                      e.currentTarget.style.color = textMuted;
                       e.currentTarget.style.background = 'none';
                     }}
                   >
@@ -721,14 +735,14 @@ export function CanvasView() {
                     position: 'absolute',
                     top: (36 / zoom),
                     right: 0,
-                    background: 'rgba(18,18,18,0.97)',
-                    border: `${1 / zoom}px solid rgba(255,255,255,0.1)`,
-                    borderRadius: 7 / zoom,
+                    background: '#242424',
+                    border: `${1 / zoom}px solid #3a3a3a`,
+                    borderRadius: 8 / zoom,
                     padding: 8 / zoom,
                     display: 'flex',
                     gap: 6 / zoom,
                     zIndex: 20,
-                    boxShadow: `0 8px 28px rgba(0,0,0,0.7)`,
+                    boxShadow: `0 8px 30px rgba(0,0,0,0.6)`,
                   }}
                 >
                   {CARD_COLORS.map((col, idx) => (
@@ -740,16 +754,15 @@ export function CanvasView() {
                         setColorPickerOpen(null);
                       }}
                       style={{
-                        width: 14 / zoom, height: 14 / zoom,
+                        width: 16 / zoom, height: 16 / zoom,
                         borderRadius: '50%',
-                        background: col.border === 'rgba(255,255,255,0.09)'
-                          ? 'rgba(255,255,255,0.18)'
-                          : col.border,
+                        background: idx === 0 ? 'rgba(255,255,255,0.2)' : col.border,
                         cursor: 'pointer',
                         border: colorIdx === idx
-                          ? `${2 / zoom}px solid rgba(255,255,255,0.7)`
-                          : `${1 / zoom}px solid rgba(255,255,255,0.15)`,
-                        transition: 'transform 0.1s',
+                          ? `${2 / zoom}px solid ${textPrimary}`
+                          : `${1 / zoom}px solid rgba(255,255,255,0.1)`,
+                        transition: 'transform 0.15s ease, border-color 0.15s ease',
+                        boxShadow: colorIdx === idx ? `0 0 8px ${col.border}` : 'none',
                       }}
                       onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.2)'; }}
                       onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
@@ -768,15 +781,15 @@ export function CanvasView() {
                 {isNote ? (
                   <div style={{
                     fontSize: 11 / zoom,
-                    color: 'rgba(255,255,255,0.42)',
+                    color: textSecondary,
                     lineHeight: 1.65,
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                     overflow: 'hidden',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   }}>
                     {previewLines.slice(0, 220) || (
-                      <span style={{ color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>
+                      <span style={{ color: textMuted, fontStyle: 'italic' }}>
                         Empty note
                       </span>
                     )}
@@ -793,10 +806,10 @@ export function CanvasView() {
                       background: 'none',
                       border: 'none',
                       outline: 'none',
-                      color: 'rgba(255,255,255,0.68)',
+                      color: textPrimary,
                       fontSize: 11 / zoom,
                       resize: 'none',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                       lineHeight: 1.65,
                       minHeight: 90 / zoom,
                     }}
@@ -814,22 +827,23 @@ export function CanvasView() {
         style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           padding: '9px 14px',
-          background: 'rgba(13,13,13,0.94)',
-          borderBottom: `1px solid ${borderColorDefault}`,
-          backdropFilter: 'blur(14px)',
+          background: 'rgba(28,28,28,0.85)',
+          borderBottom: `1px solid #2b2b2b`,
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           zIndex: 10,
         }}
       >
         <div className="flex items-center gap-3">
           <FlintLogo size={14} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.2 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: textSecondary, letterSpacing: 0.2 }}>
             Canvas
           </span>
           <span style={{
-            fontSize: 10, color: 'rgba(255,255,255,0.28)',
-            background: 'rgba(255,255,255,0.04)',
+            fontSize: 10, color: textMuted,
+            background: 'rgba(255,255,255,0.03)',
             padding: '2px 8px', borderRadius: 4,
-            border: `1px solid ${borderColorDefault}`,
+            border: `1px solid #2b2b2b`,
           }}>
             {filteredCards.length} cards · {wikilinkEdges.length + connections.length} links
           </span>
@@ -839,25 +853,26 @@ export function CanvasView() {
             onClick={addTextCard}
             title="Add text card"
             style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${borderColorDefault}`,
-              color: 'rgba(255,255,255,0.45)',
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid #3a3a3a`,
+              color: textSecondary,
               cursor: 'pointer',
               padding: '4px 10px',
-              borderRadius: 5,
+              borderRadius: 6,
               fontSize: 11,
               display: 'flex', alignItems: 'center', gap: 5,
               letterSpacing: 0.1,
+              transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(124,111,159,0.15)';
-              e.currentTarget.style.color = 'rgba(255,255,255,0.82)';
-              e.currentTarget.style.borderColor = 'rgba(124,111,159,0.4)';
+              e.currentTarget.style.background = 'rgba(127,109,242,0.12)';
+              e.currentTarget.style.color = textPrimary;
+              e.currentTarget.style.borderColor = 'rgba(127,109,242,0.4)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-              e.currentTarget.style.color = 'rgba(255,255,255,0.45)';
-              e.currentTarget.style.borderColor = borderColorDefault;
+              e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+              e.currentTarget.style.color = textSecondary;
+              e.currentTarget.style.borderColor = '#3a3a3a';
             }}
           >
             <Type size={11} />
@@ -869,25 +884,28 @@ export function CanvasView() {
           {/* Search */}
           <div className="flex items-center gap-2" style={{
             padding: '5px 10px',
-            background: 'rgba(255,255,255,0.04)',
-            border: `1px solid ${borderColorDefault}`,
+            background: 'rgba(255,255,255,0.03)',
+            border: `1px solid #2b2b2b`,
             borderRadius: 6,
+            transition: 'border-color 0.15s ease',
           }}>
-            <Search size={11} style={{ color: 'rgba(255,255,255,0.28)' }} />
+            <Search size={11} style={{ color: textMuted }} />
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Filter cards..."
               style={{
                 background: 'none', border: 'none', outline: 'none',
-                color: 'rgba(255,255,255,0.8)', fontSize: 12, width: 150,
+                color: textPrimary, fontSize: 12, width: 150,
                 fontFamily: 'inherit',
               }}
             />
             {query && (
               <button
                 onClick={() => setQuery('')}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', cursor: 'pointer', padding: 0, display: 'flex' }}
+                style={{ background: 'none', border: 'none', color: textMuted, cursor: 'pointer', padding: 0, display: 'flex', transition: 'color 0.15s ease' }}
+                onMouseEnter={e => e.currentTarget.style.color = textPrimary}
+                onMouseLeave={e => e.currentTarget.style.color = textMuted}
               >
                 <X size={11} />
               </button>
@@ -896,7 +914,7 @@ export function CanvasView() {
 
           {/* Zoom */}
           <span style={{
-            fontSize: 10, color: 'rgba(255,255,255,0.28)',
+            fontSize: 10, color: textMuted,
             fontVariantNumeric: 'tabular-nums', minWidth: 38, textAlign: 'center',
           }}>
             {Math.round(zoom * 100)}%
@@ -908,15 +926,16 @@ export function CanvasView() {
             title="Reset layout"
             style={{
               background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.28)', cursor: 'pointer',
+              color: textMuted, cursor: 'pointer',
               display: 'flex', alignItems: 'center', fontSize: 11, padding: '4px 6px', borderRadius: 4,
+              transition: 'color 0.15s ease, background 0.15s ease',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+              e.currentTarget.style.color = textPrimary;
               e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.28)';
+              e.currentTarget.style.color = textMuted;
               e.currentTarget.style.background = 'none';
             }}
           >
@@ -928,15 +947,16 @@ export function CanvasView() {
             onClick={() => dispatch({ type: 'TOGGLE_CANVAS_VIEW' })}
             style={{
               background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.28)', cursor: 'pointer',
+              color: textMuted, cursor: 'pointer',
               display: 'flex', padding: 4, borderRadius: 4,
+              transition: 'color 0.15s ease, background 0.15s ease',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
+              e.currentTarget.style.color = textPrimary;
               e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.color = 'rgba(255,255,255,0.28)';
+              e.currentTarget.style.color = textMuted;
               e.currentTarget.style.background = 'none';
             }}
           >
@@ -949,7 +969,7 @@ export function CanvasView() {
       <div style={{
         position: 'absolute', bottom: 12, left: '50%',
         transform: 'translateX(-50%)',
-        fontSize: 10, color: 'rgba(255,255,255,0.18)',
+        fontSize: 10, color: '#444444',
         display: 'flex', gap: 10,
         pointerEvents: 'none', whiteSpace: 'nowrap',
       }}>
