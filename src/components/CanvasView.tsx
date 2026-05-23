@@ -154,26 +154,6 @@ export function CanvasView() {
     dispatch({ type: 'UPDATE_CANVAS_CARDS', payload: newCards });
   }, [dispatch]);
 
-  // Initial layout
-  useEffect(() => {
-    if (activeVaultId && cards.length === 0 && state.notes.length > 0) {
-      const initialCards: CanvasCard[] = state.notes.slice(0, 20).map((note, index) => {
-        const col = index % 4;
-        const row = Math.floor(index / 4);
-        return {
-          id: note.id,
-          type: 'note',
-          noteId: note.id,
-          x: 60 + col * 300,
-          y: 80 + row * 200,
-          w: 240,
-          h: 140,
-        };
-      });
-      updateCards(initialCards);
-    }
-  }, [activeVaultId]);
-
   const filteredCards = useMemo(() => {
     if (!query.trim()) return cards;
     const q = query.toLowerCase();
@@ -264,13 +244,11 @@ export function CanvasView() {
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Check if connection drag ended on another card
     if (connDragRef.current) {
       const rect = containerRef.current!.getBoundingClientRect();
       const mx = (e.clientX - rect.left - pan.x) / zoom;
       const my = (e.clientY - rect.top - pan.y) / zoom;
 
-      // Find card under cursor
       const target = filteredCards.find(c =>
         c.id !== connDragRef.current!.fromCard &&
         mx >= c.x && mx <= c.x + c.w &&
@@ -352,7 +330,6 @@ export function CanvasView() {
   const renderConnections = () => {
     const allEdges: JSX.Element[] = [];
 
-    // Wikilink auto-edges (dashed)
     wikilinkEdges.forEach(edge => {
       const from = findCard(edge.from);
       const to = findCard(edge.to);
@@ -373,7 +350,6 @@ export function CanvasView() {
       );
     });
 
-    // Manual connections (solid, colored, deletable)
     connections.forEach(conn => {
       const from = findCard(conn.fromCard);
       const to = findCard(conn.toCard);
@@ -386,7 +362,6 @@ export function CanvasView() {
 
       allEdges.push(
         <g key={conn.id}>
-          {/* Invisible fat hit target */}
           <path
             d={bezierPath(p1.x, p1.y, p2.x, p2.y)}
             stroke="transparent"
@@ -404,7 +379,6 @@ export function CanvasView() {
             markerEnd={`url(#arrow-colored-${conn.id})`}
             style={{ pointerEvents: 'none' }}
           />
-          {/* Delete badge at midpoint */}
           <g
             transform={`translate(${midX}, ${midY})`}
             style={{ cursor: 'pointer' }}
@@ -461,11 +435,9 @@ export function CanvasView() {
         }}
       >
         <defs>
-          {/* Dim arrow for wikilinks */}
           <marker id="arrow-dim" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
             <path d="M0,0 L0,7 L7,3.5 z" fill="#4a4a4a" />
           </marker>
-          {/* Colored arrows for manual connections */}
           {connections.map(conn => (
             <marker
               key={conn.id}
@@ -475,7 +447,6 @@ export function CanvasView() {
               <path d="M0,0 L0,7 L7,3.5 z" fill={conn.color || accentColor} fillOpacity={0.8} />
             </marker>
           ))}
-          {/* Live drag arrow */}
           <marker id="arrow-live" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
             <path d="M0,0 L0,7 L7,3.5 z" fill={accentColor} fillOpacity={0.8} />
           </marker>
@@ -484,7 +455,6 @@ export function CanvasView() {
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
           {renderConnections()}
 
-          {/* Live connection drag preview */}
           {connDrag && (() => {
             const fromCard = findCard(connDrag.fromCard);
             if (!fromCard) return null;
@@ -588,7 +558,6 @@ export function CanvasView() {
                 setColorPickerOpen(null);
               }}
             >
-              {/* Connection dots — shown on hover via CSS */}
               <style>{`
                 .canvas-card-root:hover .conn-dot { opacity: 0.85 !important; }
                 .conn-dot:hover { opacity: 1 !important; transform: scale(1.3) !important; background: #9f94f7 !important; }
@@ -652,7 +621,6 @@ export function CanvasView() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 2 / zoom, flexShrink: 0 }}>
-                  {/* Color picker toggle */}
                   <button
                     onMouseDown={e => e.stopPropagation()}
                     onClick={e => {
