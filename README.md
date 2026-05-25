@@ -17,20 +17,11 @@
 
 ---
 
-<img width="1324" height="767" alt="flint" src="https://github.com/user-attachments/assets/57b27b77-5d98-45f5-96bd-dd65575323c8" />
+<div align=center>
 
----
+https://github.com/user-attachments/assets/8f570dfe-9b1c-4076-8c05-b6f0e0d29be1
 
-##  Video Overview of Flint  !!
-
-<details>
-       
-  <summary>Tap to view ⤥ </summary>
-       
-https://github.com/user-attachments/assets/eab43b70-609a-4373-8f2c-8afc854dece9
-
-</details>   
-
+</div>
 ---
 
 ##  Installation
