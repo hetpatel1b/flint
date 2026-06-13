@@ -1,1 +1,2 @@
-- *Currently, I am not able to check if the models and the agent are working or not in the local Ollama and the llama-cpp-python setup, just because of the hardware lacks and the model's tool-calling missing feature in low-parameter and base models.*
+- ### *If this project could not satisfy the promises that are shown in the `readme`, I am so sorry for that.*
+- ### *And if it violates any rule or any policy of `Obsidian` (which I don't know) - so also sorry for those mistakes.*
