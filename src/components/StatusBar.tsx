@@ -22,7 +22,7 @@ export function StatusBar() {
         )}
       </div>
       <div className="flex items-center gap-4">
-        <span style={{ color: 'var(--text-secondary)' }}>Auto-save ✓</span>
+        <span style={{ color: 'var(--text-secondary)' }}>Auto-save on</span>
         <div className="flex items-center gap-1">
           <FlintLogo size={10} />
           <span style={{ color: 'var(--text-secondary)' }}>Flint v1.0</span>
