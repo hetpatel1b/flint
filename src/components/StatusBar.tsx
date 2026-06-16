@@ -17,12 +17,12 @@ export function StatusBar() {
         <span>{chars} chars</span>
         {state.hasFolderHandle && activeVault?.isFolderVault && (
           <span className="flex items-center gap-1" style={{ color: 'var(--accent)' }}>
-            <HardDrive size={10} /> {activeVault.folderPath}
+            <HardDrive size={10} aria-hidden="true" /> {activeVault.folderPath}
           </span>
         )}
       </div>
       <div className="flex items-center gap-4">
-        <span style={{ color: 'var(--text-secondary)' }}>Auto-save ✓</span>
+        <span style={{ color: 'var(--text-secondary)' }}>Auto-save on</span>
         <div className="flex items-center gap-1">
           <FlintLogo size={10} />
           <span style={{ color: 'var(--text-secondary)' }}>Flint v1.0</span>
