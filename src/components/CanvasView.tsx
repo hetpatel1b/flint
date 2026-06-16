@@ -146,6 +146,152 @@ interface HistoryState {
   cardColors: Record<string, number>;
 }
 
+interface LineContextMenu {
+  connId: string;
+  x: number;
+  y: number;
+}
+
+// ─── Sub-Component for drag & drop Image cards ──────────────────────────────
+
+interface ImageCardBodyProps {
+  card: CanvasCard;
+  zoom: number;
+  updateCard: (id: string, updates: Partial<CanvasCard>) => void;
+  pushHistorySnapshot: () => void;
+}
+
+function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCardBodyProps) {
+  const [isDragHover, setIsDragHover] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = (file: File | undefined) => {
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          pushHistorySnapshot();
+          updateCard(card.id, { content: e.target.result as string });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  if (card.content) {
+    return (
+      <div 
+        style={{ 
+          position: 'relative', 
+          width: '100%', 
+          height: '100%', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          background: '#09090b',
+          overflow: 'hidden',
+          borderRadius: '0 0 6px 6px',
+        }}
+      >
+        <img
+          src={card.content}
+          alt="Canvas PNG Attachment"
+          style={{
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain',
+            pointerEvents: 'none',
+          }}
+        />
+        {/* Hover overlay to change the loaded image */}
+        <div 
+          className="image-overlay-layer"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            opacity: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'opacity 0.15s ease',
+          }}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <span style={{ color: '#fff', fontSize: 11 / zoom, fontWeight: 500, background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 4 }}>
+            Change Image
+          </span>
+        </div>
+        <input
+          type="file"
+          accept="image/*"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+        <style>{`
+          .image-overlay-layer { opacity: 0; }
+          div:hover > .image-overlay-layer { opacity: 1 !important; }
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => fileInputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); setIsDragHover(true); }}
+      onDragLeave={() => setIsDragHover(false)}
+      onDrop={(e) => { e.preventDefault(); setIsDragHover(false); handleFile(e.dataTransfer.files?.[0]); }}
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: `2px dashed ${isDragHover ? '#7f6df2' : '#2e2e31'}`,
+        background: isDragHover ? 'rgba(127,109,242,0.06)' : 'rgba(0,0,0,0.15)',
+        borderRadius: 6,
+        margin: 6,
+        padding: 16,
+        cursor: 'pointer',
+        textAlign: 'center',
+        transition: 'all 0.15s ease',
+      }}
+    >
+      <svg 
+        width={22 / zoom} 
+        height={22 / zoom} 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke={isDragHover ? '#7f6df2' : '#555558'} 
+        strokeWidth="1.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round"
+        style={{ marginBottom: 6, transition: 'stroke 0.15s' }}
+      >
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
+      </svg>
+      <span style={{ fontSize: 11 / zoom, color: isDragHover ? '#7f6df2' : '#b3b3b3', fontWeight: 500, display: 'block', marginBottom: 2 }}>
+        Drag & drop PNG/image
+      </span>
+      <span style={{ fontSize: 9.5 / zoom, color: '#666668' }}>
+        or click to browse
+      </span>
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function CanvasView() {
@@ -181,6 +327,9 @@ export function CanvasView() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [colorPickerOpen, setColorPickerOpen] = useState<string | null>(null);
   
+  // Custom right click line context menu state
+  const [lineContextMenu, setLineContextMenu] = useState<LineContextMenu | null>(null);
+  
   // Note adding dropdown
   const [notePickerOpen, setNotePickerOpen] = useState(false);
   const [noteSearch, setNoteSearch] = useState('');
@@ -212,6 +361,17 @@ export function CanvasView() {
       );
     } catch {}
   }, [cardColors, activeVaultId]);
+
+  // Close context menu on any outside click
+  useEffect(() => {
+    const closeMenu = () => setLineContextMenu(null);
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('contextmenu', closeMenu);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('contextmenu', closeMenu);
+    };
+  }, []);
 
   // ─── Undo & Redo History Management ─────────────────────────────────────────
 
@@ -340,6 +500,21 @@ export function CanvasView() {
     setNotePickerOpen(false);
   };
 
+  const addImageCard = () => {
+    pushHistorySnapshot();
+    const newCard: CanvasCard = {
+      id: `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      type: 'text', // Safe fallback typing
+      content: '', // Holds Base64 Image string
+      x: Math.round(((window.innerWidth / 2 - pan.x) / zoom) / 20) * 20,
+      y: Math.round(((window.innerHeight / 2 - pan.y) / zoom) / 20) * 20,
+      w: 280,
+      h: 220,
+    };
+    updateCards([...cards, newCard]);
+    setSelectedCard(newCard.id);
+  };
+
   const deleteCard = useCallback((id: string) => {
     pushHistorySnapshot();
     updateCards(cards.filter(c => c.id !== id));
@@ -371,6 +546,7 @@ export function CanvasView() {
         setSelectedCard(null);
         setColorPickerOpen(null);
         setNotePickerOpen(false);
+        setLineContextMenu(null);
       }
       
       // Delete card with Backspace or Delete
@@ -585,59 +761,38 @@ export function CanvasView() {
       const p1 = getSidePt(from, conn.fromSide);
       const p2 = getSidePt(to, conn.toSide);
       const color = conn.color || accentColor;
-      const midX = (p1.x + p2.x) / 2;
-      const midY = (p1.y + p2.y) / 2;
       
       allEdges.push(
         <g key={conn.id}>
-          {/* Broad transparent path to capture mouse hover easily */}
+          {/* Broad transparent path to capture hover & right-click context menu */}
           <path
             d={smartBezier(p1, conn.fromSide, p2, conn.toSide)}
             stroke="transparent"
             strokeWidth={14 / zoom}
             fill="none"
-            style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
+            style={{ cursor: 'context-menu', pointerEvents: 'stroke' }}
             onMouseEnter={() => setHoveredConn(conn.id)}
             onMouseLeave={() => setHoveredConn(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setLineContextMenu({
+                connId: conn.id,
+                x: e.clientX,
+                y: e.clientY,
+              });
+            }}
           />
           {/* Main visual connection path */}
           <path
             d={smartBezier(p1, conn.fromSide, p2, conn.toSide)}
             stroke={color}
-            strokeWidth={hoveredConn === conn.id ? 2.5 / zoom : 1.8 / zoom}
+            strokeWidth={hoveredConn === conn.id || lineContextMenu?.connId === conn.id ? 2.5 / zoom : 1.8 / zoom}
             fill="none"
             strokeOpacity={0.85}
             markerEnd={`url(#arrow-${color.replace('#', '')})`}
             style={{ pointerEvents: 'none', transition: 'stroke-width 0.1s ease' }}
           />
-          {/* Floating Midpoint Menu with ONLY a beautifully styled working 'X' button to delete connection */}
-          {hoveredConn === conn.id && (
-            <g transform={`translate(${midX}, ${midY})`} style={{ pointerEvents: 'auto' }}>
-              <g
-                style={{ cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteConnection(conn.id);
-                }}
-              >
-                {/* Background button circle */}
-                <circle 
-                  r={10 / zoom} 
-                  fill="#1d1d20" 
-                  stroke={color} 
-                  strokeWidth={1.5 / zoom}
-                  style={{ transition: 'transform 0.1s ease' }}
-                />
-                {/* Visual vector 'X' */}
-                <path
-                  d={`M ${-4.5 / zoom} ${-4.5 / zoom} L ${4.5 / zoom} ${4.5 / zoom} M ${4.5 / zoom} ${-4.5 / zoom} L ${-4.5 / zoom} ${4.5 / zoom}`}
-                  stroke="#ffffff"
-                  strokeWidth={1.8 / zoom}
-                  strokeLinecap="round"
-                />
-              </g>
-            </g>
-          )}
         </g>
       );
     });
@@ -680,6 +835,7 @@ export function CanvasView() {
       >
         {filteredCards.map(card => {
           const isNote = card.type === 'note';
+          const isImage = card.id.startsWith('image');
           const note = isNote ? state.notes.find(n => n.id === card.noteId) : null;
           const isActive = isNote && note?.id === state.activeNoteId;
           
@@ -689,6 +845,8 @@ export function CanvasView() {
             
           const titleLine = isNote && note
             ? note.content.split('\n').find(l => l.startsWith('# '))?.replace(/^# /, '') || note.title
+            : isImage
+            ? 'PNG Attachment'
             : 'Text Card';
             
           const colorIdx = cardColors[card.id] ?? 0;
@@ -935,6 +1093,12 @@ export function CanvasView() {
                   <Grip size={11} style={{ color: textMuted, flexShrink: 0 }} />
                   {isNote ? (
                     <FileText size={11} style={{ color: colorIdx > 0 ? cardColor.border : '#8c7ae6', flexShrink: 0 }} />
+                  ) : isImage ? (
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={colorIdx > 0 ? cardColor.border : '#0fbcf9'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
                   ) : (
                     <Type size={11} style={{ color: colorIdx > 0 ? cardColor.border : '#00a8ff', flexShrink: 0 }} />
                   )}
@@ -957,7 +1121,7 @@ export function CanvasView() {
               </div>
 
               {/* ─── Card Body Content ─── */}
-              <div style={{ padding: '8px 10px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ padding: isImage ? 0 : '8px 10px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {isNote ? (
                   <div style={{
                     fontSize: 11.5, color: textSecondary, lineHeight: 1.5,
@@ -971,6 +1135,13 @@ export function CanvasView() {
                       <span style={{ color: textMuted, fontStyle: 'italic' }}>Empty note file</span>
                     )}
                   </div>
+                ) : isImage ? (
+                  <ImageCardBody 
+                    card={card} 
+                    zoom={zoom} 
+                    updateCard={updateCard} 
+                    pushHistorySnapshot={pushHistorySnapshot} 
+                  />
                 ) : (
                   <textarea
                     value={card.content || ''}
@@ -1067,6 +1238,86 @@ export function CanvasView() {
           })()}
         </g>
       </svg>
+
+      {/* ─── Custom Right-Click Context Menu for Connection Lines ─── */}
+      {lineContextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            left: lineContextMenu.x,
+            top: lineContextMenu.y,
+            background: '#1c1c1e',
+            border: '1px solid #2e2e31',
+            borderRadius: 6,
+            boxShadow: '0 12px 36px rgba(0,0,0,0.6)',
+            padding: '4px 0',
+            width: 170,
+            zIndex: 200,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Option 1: Delete Line */}
+          <button
+            onClick={() => {
+              deleteConnection(lineContextMenu.connId);
+              setLineContextMenu(null);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              background: 'none',
+              border: 'none',
+              color: '#ff5f5f',
+              padding: '7px 12px',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontFamily: 'inherit',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,95,95,0.1)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <Trash2 size={12} />
+            <span>Delete connection</span>
+          </button>
+
+          <div style={{ height: 1, background: '#2e2e31', margin: '4px 0' }} />
+
+          {/* Option 2: Change Line Color Grid */}
+          <div style={{ padding: '6px 12px' }}>
+            <span style={{ fontSize: 10.5, color: textSecondary, fontWeight: 500, display: 'block', marginBottom: 6 }}>Change color</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5 }}>
+              {CONN_COLORS.map(color => (
+                <button
+                  key={color}
+                  onClick={() => {
+                    pushHistorySnapshot();
+                    setConnections(prev => prev.map(c => c.id === lineContextMenu.connId ? { ...c, color } : c));
+                    setLineContextMenu(null);
+                  }}
+                  title={`Change color to ${color}`}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: color,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                    transition: 'transform 0.1s ease',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Top Header Actions Panel ─── */}
       <div
@@ -1218,7 +1469,7 @@ export function CanvasView() {
           {/* Add Text Card Button */}
           <button
             onClick={addTextCard}
-            title="Create Card"
+            title="Create Text Card"
             style={{
               background: 'none', border: 'none', color: textSecondary,
               cursor: 'pointer', padding: '6px 12px', borderRadius: 9999, fontSize: 11.5,
@@ -1249,6 +1500,29 @@ export function CanvasView() {
           >
             <FileText size={12} />
             <span>Add Note</span>
+          </button>
+
+          <div style={{ height: 16, width: 1, background: 'rgba(255,255,255,0.08)' }} />
+
+          {/* Add PNG Image Card Button (Added near Note as requested!) */}
+          <button
+            onClick={addImageCard}
+            title="Add PNG / Image Card"
+            style={{
+              background: 'none', border: 'none', color: textSecondary,
+              cursor: 'pointer', padding: '6px 12px', borderRadius: 9999, fontSize: 11.5,
+              fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'background-color 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = textSecondary; e.currentTarget.style.background = 'none'; }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            <span>Add PNG</span>
           </button>
 
           <div style={{ height: 16, width: 1, background: 'rgba(255,255,255,0.08)' }} />
@@ -1378,8 +1652,7 @@ export function CanvasView() {
       }}>
         <span>Scroll to pan</span> <span>·</span>
         <span>Ctrl+Scroll to zoom</span> <span>·</span>
-        <span>Drag header to move card</span> <span>·</span>
-        <span>Drag side dots to connect</span> <span>·</span>
+        <span>Right-Click line for options</span> <span>·</span>
         <span>Ctrl+Z to Undo</span> <span>·</span>
         <span>ESC to cancel/deselect</span>
       </div>
