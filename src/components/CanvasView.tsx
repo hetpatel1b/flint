@@ -4,7 +4,7 @@ import { FlintLogo } from './FlintLogo';
 import { Grip, RotateCcw, Search, X, Plus, Type, Trash2, FileText } from 'lucide-react';
 import type { CanvasCard } from '../types';
 
-// Persistence
+// ─── Persistence ──────────────────────────────────────────────────────────────
 
 function getCanvasKey(vaultId: string | null) {
   return `flint-canvas-state-${vaultId || 'default'}`;
@@ -40,7 +40,7 @@ function saveCanvasState(vaultId: string | null, data: CanvasPersistedState) {
   }
 }
 
-// Card color palette
+// ─── Card color palette (Obsidian-style) ──────────────────────────────────────
 
 const CARD_COLORS = [
   { label: 'Default', border: '#2e2e2e', glow: '' },
@@ -53,11 +53,11 @@ const CARD_COLORS = [
   { label: 'Pink',    border: '#e040a0', glow: 'rgba(224,64,160,0.2)' },
 ];
 
-// Connection colors
+// ─── Connection colors (Defaulting to slate steel blue `#56728c`!) ───────────
 
 const CONN_COLORS = [
   '#56728c', // 1. Slate steel blue (default!)
-  '#7f6df2', // 2. Purple
+  '#7f6df2', // 2. Obsidian Purple
   '#e5555a', // 3. Red
   '#43a047', // 4. Green
   '#00acc1', // 5. Cyan
@@ -67,7 +67,7 @@ const CONN_COLORS = [
   '#dcddde', // 9. Slate Gray
 ];
 
-// Helpers
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 type Side = 'top' | 'right' | 'bottom' | 'left';
 
@@ -184,7 +184,7 @@ interface CardContextMenu {
   y: number;
 }
 
-// Sub-component for drag and drop image cards
+// ─── Sub-Component for drag & drop Image cards ──────────────────────────────
 
 interface ImageCardBodyProps {
   card: CanvasCard;
@@ -324,7 +324,7 @@ function ImageCardBody({ card, zoom, updateCard, pushHistorySnapshot }: ImageCar
   );
 }
 
-// Main component
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function CanvasView() {
   const { state, dispatch } = useStore();
@@ -418,7 +418,7 @@ export function CanvasView() {
     };
   }, []);
 
-  // Undo and redo history
+  // ─── Undo & Redo History Management ─────────────────────────────────────────
 
   const [undoStack, setUndoStack] = useState<HistoryState[]>([]);
   const [redoStack, setRedoStack] = useState<HistoryState[]>([]);
@@ -787,12 +787,12 @@ export function CanvasView() {
 
   const findCard = (id: string) => filteredCards.find(c => c.id === id);
 
-  const accentColor = '#7f6df2'; // Purple accent
-  const canvasBg = '#0f0f11'; // Dark canvas background
-  const cardBg = '#18181a'; // Dark matte card background
-  const cardBgActive = '#1d1d21'; // Highlighted card background
+  const accentColor = '#7f6df2'; // Obsidian Purple Accent
+  const canvasBg = '#0f0f11'; // Pure Obsidian Dark Canvas BG
+  const cardBg = '#18181a'; // Obsidian deep dark matte card BG
+  const cardBgActive = '#1d1d21'; // Highlighted Obsidian card BG
   const cardBorderDefault = '#2a2a2c'; // Extremely subtle border
-  const textPrimary = '#e3e3e3'; // Main text
+  const textPrimary = '#e3e3e3'; // Obsidian-standard main white text
   const textSecondary = '#b3b3b3'; // Gray text
   const textMuted = '#666668'; // Muted dark grey
 
@@ -888,7 +888,7 @@ export function CanvasView() {
       onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Infinite grid background */}
+      {/* ─── Infinite Grid Background ─── */}
       <div
         style={{
           position: 'absolute',
@@ -900,7 +900,7 @@ export function CanvasView() {
         }}
       />
 
-      {/* Cards viewport layer */}
+      {/* ─── Cards Viewport Layer ─── */}
       <div
         style={{
           position: 'absolute',
@@ -1035,7 +1035,7 @@ export function CanvasView() {
                 });
               }}
             >
-              {/* Connection anchor dots */}
+              {/* ─── Connection Anchor Dots (Visible on hover; Frame cards don't have anchor dots!) ─── */}
               {!isFrame && edges.map(side => (
                 <div
                   key={side}
@@ -1051,7 +1051,7 @@ export function CanvasView() {
                 />
               ))}
 
-              {/* Resizing handles */}
+              {/* ─── Aesthetic Resizing Handles (Obsidian-Style border nodes when selected) ─── */}
               {isSelected && (
                 <>
                   {/* Top-Left handle */}
@@ -1073,7 +1073,7 @@ export function CanvasView() {
                 </>
               )}
 
-              {/* Card header */}
+              {/* ─── Card Header (Dragging is handled here - smooth and precise!) ─── */}
               <div
                 onMouseDown={e => {
                   e.stopPropagation();
@@ -1158,7 +1158,7 @@ export function CanvasView() {
                 </div>
               </div>
 
-              {/* Card body content */}
+              {/* ─── Card Body Content ─── */}
               {/* Frames do not render a content body; they let notes inside them show through */}
               {!isFrame && (
                 <div style={{ padding: isImage ? 0 : '8px 10px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1200,7 +1200,7 @@ export function CanvasView() {
                 </div>
               )}
 
-              {/* Resizing node handle */}
+              {/* ─── Resizing Node Handle (Bottom Right) ─── */}
               <div
                 onMouseDown={e => {
                   e.stopPropagation(); e.preventDefault();
@@ -1223,7 +1223,7 @@ export function CanvasView() {
         })}
       </div>
 
-      {/* Connection paths layer */}
+      {/* ─── Connection Paths Layer ─── */}
       <svg
         style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -1281,7 +1281,7 @@ export function CanvasView() {
         </g>
       </svg>
 
-      {/* Custom right-click context menu for connection lines */}
+      {/* ─── Custom Right-Click Context Menu for Connection Lines ─── */}
       {lineContextMenu && (
         <div
           style={{
@@ -1361,7 +1361,7 @@ export function CanvasView() {
         </div>
       )}
 
-      {/* Custom right-click context menu for note, text, and PNG cards */}
+      {/* ─── Custom Right-Click Context Menu for Note, Text, and PNG Cards ─── */}
       {cardContextMenu && (
         <div
           style={{
@@ -1441,7 +1441,7 @@ export function CanvasView() {
         </div>
       )}
 
-      {/* Top header actions panel */}
+      {/* ─── Top Header Actions Panel ─── */}
       <div
         className="flex items-center justify-between"
         style={{
@@ -1452,7 +1452,7 @@ export function CanvasView() {
       >
         <div className="flex items-center gap-3">
           <FlintLogo size={14} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: textPrimary, letterSpacing: '0.2px' }}>Flint Canvas</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: textPrimary, letterSpacing: '0.2px' }}>Obsidian Canvas</span>
           <span style={{
             fontSize: 10.5, color: textSecondary, background: 'rgba(255,255,255,0.03)',
             padding: '2px 8px', borderRadius: 4, border: `1px solid #232326`,
@@ -1497,7 +1497,7 @@ export function CanvasView() {
         </div>
       </div>
 
-      {/* Bottom center floating toolbar */}
+      {/* ─── Bottom Center Floating Obsidian Toolbar ─── */}
       <div
         style={{
           position: 'absolute',
@@ -1706,7 +1706,7 @@ export function CanvasView() {
         </div>
       </div>
 
-      {/* Bottom right floating zoom panel */}
+      {/* ─── Bottom Right Floating Obsidian Zoom Panel ─── */}
       <div
         style={{
           position: 'absolute',
@@ -1738,7 +1738,7 @@ export function CanvasView() {
           onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
           onMouseLeave={e => { e.currentTarget.style.color = textSecondary; e.currentTarget.style.background = 'none'; }}
         >
-          -
+          －
         </button>
 
         {/* Zoom level label */}
@@ -1762,7 +1762,7 @@ export function CanvasView() {
           onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
           onMouseLeave={e => { e.currentTarget.style.color = textSecondary; e.currentTarget.style.background = 'none'; }}
         >
-          +
+          ＋
         </button>
 
         <div style={{ height: 14, width: 1, background: 'rgba(255,255,255,0.08)', margin: '0 3px' }} />
@@ -1784,20 +1784,20 @@ export function CanvasView() {
         </button>
       </div>
 
-      {/* Bottom keyboard shortcut helper panel */}
+      {/* ─── Bottom Keyboard Shortcut Helper Panel ─── */}
       <div style={{
         position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
         fontSize: 9.5, color: textMuted, display: 'flex', gap: 8, pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10,
         background: 'rgba(15,15,17,0.35)', padding: '2px 8px', borderRadius: 4, backdropFilter: 'blur(4px)',
       }}>
-        <span>Left-click drag empty board to pan</span> <span>-</span>
-        <span>Drag header to move card</span> <span>-</span>
-        <span>Right-click card or line for settings</span> <span>-</span>
-        <span>Ctrl+Z to Undo</span> <span>-</span>
+        <span>Left-Click Drag Empty Board to Pan</span> <span>·</span>
+        <span>Drag Header to Move Card</span> <span>·</span>
+        <span>Right-Click card or line for settings</span> <span>·</span>
+        <span>Ctrl+Z to Undo</span> <span>·</span>
         <span>ESC to cancel</span>
       </div>
 
-      {/* Global scrollbar CSS */}
+      {/* ─── Global Scrollbar CSS Styling injection ─── */}
       <style>{`
         .canvas-card-scroll::-webkit-scrollbar {
           width: 4px;
